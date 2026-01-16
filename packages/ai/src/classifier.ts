@@ -98,11 +98,11 @@ export class GTDClassifier {
 
     // Add optional fields if present and valid
     if (raw.context && isValidContext(raw.context)) {
-      result.context = raw.context;
+      result.context = raw.context as ClassificationResult['context'];
     }
 
     if (raw.priority && isValidPriority(raw.priority)) {
-      result.priority = raw.priority;
+      result.priority = raw.priority as ClassificationResult['priority'];
     }
 
     if (raw.personMatch && typeof raw.personMatch === 'object') {
@@ -147,14 +147,17 @@ interface RawClassificationResult {
 }
 
 /**
- * Type guards for validation
+ * Validation helpers
  */
-function isValidContext(context: string): context is ClassificationResult['context'] {
-  return ['work', 'home', 'errands', 'calls', 'computer', 'anywhere'].includes(context);
+const VALID_CONTEXTS = ['work', 'home', 'errands', 'calls', 'computer', 'anywhere'] as const;
+const VALID_PRIORITIES = ['today', 'this_week', 'soon'] as const;
+
+function isValidContext(context: string): boolean {
+  return VALID_CONTEXTS.includes(context as any);
 }
 
-function isValidPriority(priority: string): priority is ClassificationResult['priority'] {
-  return ['today', 'this_week', 'soon'].includes(priority);
+function isValidPriority(priority: string): boolean {
+  return VALID_PRIORITIES.includes(priority as any);
 }
 
 function isValidDate(date: string): boolean {

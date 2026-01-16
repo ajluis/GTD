@@ -105,7 +105,7 @@ export async function completeTask(
       Completed: {
         date: { start: new Date().toISOString().split('T')[0] },
       },
-    },
+    } as any,
   });
 }
 
@@ -125,7 +125,7 @@ export async function markDiscussed(
       Status: {
         status: { name: 'Discussed' },
       },
-    },
+    } as any,
   });
 }
 

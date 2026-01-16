@@ -97,9 +97,9 @@ export async function exchangeCodeForToken(
  * Create OAuth config from environment variables
  */
 export function createOAuthConfig(): NotionOAuthConfig {
-  const clientId = process.env.NOTION_CLIENT_ID;
-  const clientSecret = process.env.NOTION_CLIENT_SECRET;
-  const redirectUri = process.env.NOTION_REDIRECT_URI;
+  const clientId = process.env['NOTION_CLIENT_ID'];
+  const clientSecret = process.env['NOTION_CLIENT_SECRET'];
+  const redirectUri = process.env['NOTION_REDIRECT_URI'];
 
   if (!clientId || !clientSecret || !redirectUri) {
     throw new Error(

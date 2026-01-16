@@ -1,5 +1,6 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import type { ConnectionOptions } from 'bullmq';
 import { createDbClient } from '@clarity/database';
 import { createRedisConnection, createMessageQueue } from '@clarity/queue';
 import { healthRoutes } from './routes/health.js';
@@ -17,12 +18,12 @@ import { createNotionOAuthRoutes } from './routes/oauth/notion.js';
 async function main() {
   // Configuration from environment
   const config = {
-    port: parseInt(process.env.PORT ?? '3000', 10),
-    host: process.env.HOST ?? '0.0.0.0',
-    databaseUrl: process.env.DATABASE_URL!,
-    redisUrl: process.env.REDIS_URL!,
-    sendblueWebhookSecret: process.env.SENDBLUE_WEBHOOK_SECRET!,
-    appUrl: process.env.APP_URL ?? `http://localhost:${process.env.PORT ?? '3000'}`,
+    port: parseInt(process.env['PORT'] ?? '3000', 10),
+    host: process.env['HOST'] ?? '0.0.0.0',
+    databaseUrl: process.env['DATABASE_URL']!,
+    redisUrl: process.env['REDIS_URL']!,
+    sendblueWebhookSecret: process.env['SENDBLUE_WEBHOOK_SECRET']!,
+    appUrl: process.env['APP_URL'] ?? `http://localhost:${process.env['PORT'] ?? '3000'}`,
   };
 
   // Validate required env vars
@@ -37,9 +38,9 @@ async function main() {
   // Initialize Fastify
   const fastify = Fastify({
     logger: {
-      level: process.env.LOG_LEVEL ?? 'info',
+      level: process.env['LOG_LEVEL'] ?? 'info',
       transport:
-        process.env.NODE_ENV === 'development'
+        process.env['NODE_ENV'] === 'development'
           ? { target: 'pino-pretty', options: { colorize: true } }
           : undefined,
     },
@@ -55,8 +56,10 @@ async function main() {
   fastify.log.info('Database client initialized');
 
   // Initialize Redis and queue
+  // Cast redis to ConnectionOptions to handle ioredis version differences
   const redis = createRedisConnection(config.redisUrl);
-  const messageQueue = createMessageQueue(redis);
+  const redisConnection = redis as unknown as ConnectionOptions;
+  const messageQueue = createMessageQueue(redisConnection);
   fastify.log.info('Redis and message queue initialized');
 
   // Register routes

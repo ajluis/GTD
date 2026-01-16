@@ -1,4 +1,4 @@
-import { Worker } from 'bullmq';
+import { Worker, type Job, type ConnectionOptions } from 'bullmq';
 import { createDbClient } from '@clarity/database';
 import {
   createWorkerConnection,
@@ -23,10 +23,10 @@ import { createOutboundProcessor } from './processors/outbound.js';
 async function main() {
   // Configuration
   const config = {
-    databaseUrl: process.env.DATABASE_URL!,
-    redisUrl: process.env.REDIS_URL!,
-    appUrl: process.env.APP_URL ?? 'http://localhost:3000',
-    concurrency: parseInt(process.env.WORKER_CONCURRENCY ?? '5', 10),
+    databaseUrl: process.env['DATABASE_URL']!,
+    redisUrl: process.env['REDIS_URL']!,
+    appUrl: process.env['APP_URL'] ?? 'http://localhost:3000',
+    concurrency: parseInt(process.env['WORKER_CONCURRENCY'] ?? '5', 10),
   };
 
   // Validate required env vars
@@ -49,7 +49,9 @@ async function main() {
   console.log('[Worker] Redis connected');
 
   // Create message queue (for enqueueing follow-up jobs)
-  const messageQueue = createMessageQueue(redis);
+  // Cast redis to ConnectionOptions to handle ioredis version differences
+  const redisConnection = redis as unknown as ConnectionOptions;
+  const messageQueue = createMessageQueue(redisConnection);
 
   // Create processors
   const inboundProcessor = createInboundProcessor(db, messageQueue, config.appUrl);
@@ -60,7 +62,7 @@ async function main() {
   // Create worker
   const worker = new Worker<MessageJobData>(
     QUEUE_NAMES.MESSAGES,
-    async (job) => {
+    async (job: Job<MessageJobData>) => {
       const { type } = job.data;
 
       console.log(`[Worker] Processing job ${job.id} (type: ${type})`);
@@ -79,21 +81,21 @@ async function main() {
       }
     },
     {
-      connection: redis,
+      connection: redisConnection,
       concurrency: config.concurrency,
     }
   );
 
   // Event handlers
-  worker.on('completed', (job) => {
+  worker.on('completed', (job: Job<MessageJobData>) => {
     console.log(`[Worker] Job ${job.id} completed`);
   });
 
-  worker.on('failed', (job, error) => {
+  worker.on('failed', (job: Job<MessageJobData> | undefined, error: Error) => {
     console.error(`[Worker] Job ${job?.id} failed:`, error.message);
   });
 
-  worker.on('error', (error) => {
+  worker.on('error', (error: Error) => {
     console.error('[Worker] Worker error:', error);
   });
 

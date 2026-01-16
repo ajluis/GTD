@@ -41,18 +41,16 @@ export class GeminiClient {
    * Generate content with the configured model
    *
    * @param prompt - The prompt to send to Gemini
-   * @param systemInstruction - Optional system instruction
+   * @param systemInstruction - Optional system instruction (prepended to prompt)
    * @returns Generated text response
    */
   async generate(prompt: string, systemInstruction?: string): Promise<string> {
-    const parts = [{ text: prompt }];
+    // Combine system instruction with user prompt if provided
+    const fullPrompt = systemInstruction
+      ? `${systemInstruction}\n\n${prompt}`
+      : prompt;
 
-    const result = await this.model.generateContent({
-      contents: [{ role: 'user', parts }],
-      ...(systemInstruction && {
-        systemInstruction: { parts: [{ text: systemInstruction }] },
-      }),
-    });
+    const result = await this.model.generateContent(fullPrompt);
 
     const response = result.response;
     const text = response.text();
@@ -97,7 +95,7 @@ export class GeminiClient {
  * Create Gemini client from environment variables
  */
 export function createGeminiClient(): GeminiClient {
-  const apiKey = process.env.GOOGLE_AI_API_KEY;
+  const apiKey = process.env['GOOGLE_AI_API_KEY'];
 
   if (!apiKey) {
     throw new Error('Missing GOOGLE_AI_API_KEY environment variable');

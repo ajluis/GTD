@@ -141,9 +141,9 @@ export class SendblueClient {
  * Create Sendblue client from environment variables
  */
 export function createSendblueClient(): SendblueClient {
-  const apiKey = process.env.SENDBLUE_API_KEY;
-  const apiSecret = process.env.SENDBLUE_API_SECRET;
-  const phoneNumber = process.env.SENDBLUE_PHONE_NUMBER;
+  const apiKey = process.env['SENDBLUE_API_KEY'];
+  const apiSecret = process.env['SENDBLUE_API_SECRET'];
+  const phoneNumber = process.env['SENDBLUE_PHONE_NUMBER'];
 
   if (!apiKey || !apiSecret || !phoneNumber) {
     throw new Error(

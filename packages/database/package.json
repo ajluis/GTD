@@ -26,6 +26,7 @@
     "studio": "drizzle-kit studio"
   },
   "dependencies": {
+    "@clarity/shared-types": "workspace:*",
     "drizzle-orm": "^0.38.0",
     "postgres": "^3.4.5"
   },
