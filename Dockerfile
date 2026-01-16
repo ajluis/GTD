@@ -1,0 +1,86 @@
+# syntax=docker/dockerfile:1
+
+# ============================================
+# Base stage: Node.js with pnpm
+# ============================================
+FROM node:20-alpine AS base
+RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
+WORKDIR /app
+
+# ============================================
+# Dependencies stage: Install all dependencies
+# ============================================
+FROM base AS deps
+
+# Copy package files for dependency installation
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json turbo.json ./
+
+# Copy package.json files for each workspace
+COPY packages/shared-types/package.json ./packages/shared-types/
+COPY packages/database/package.json ./packages/database/
+COPY packages/queue/package.json ./packages/queue/
+COPY packages/sendblue/package.json ./packages/sendblue/
+COPY packages/notion/package.json ./packages/notion/
+COPY packages/ai/package.json ./packages/ai/
+COPY packages/gtd/package.json ./packages/gtd/
+COPY apps/api/package.json ./apps/api/
+COPY apps/worker/package.json ./apps/worker/
+
+# Install all dependencies
+RUN pnpm install --frozen-lockfile
+
+# ============================================
+# Builder stage: Build all packages
+# ============================================
+FROM deps AS builder
+
+# Copy source code
+COPY packages ./packages
+COPY apps ./apps
+COPY tsconfig.json ./
+
+# Build all packages
+RUN pnpm build
+
+# ============================================
+# API production image
+# ============================================
+FROM base AS api
+
+ENV NODE_ENV=production
+
+# Copy built packages and node_modules
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/packages ./packages
+COPY --from=builder /app/apps/api ./apps/api
+COPY --from=builder /app/package.json ./
+
+# Run as non-root user
+USER node
+
+EXPOSE 3000
+
+CMD ["node", "apps/api/dist/index.js"]
+
+# ============================================
+# Worker production image
+# ============================================
+FROM base AS worker
+
+ENV NODE_ENV=production
+
+# Copy built packages and node_modules
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/packages ./packages
+COPY --from=builder /app/apps/worker ./apps/worker
+COPY --from=builder /app/package.json ./
+
+# Run as non-root user
+USER node
+
+CMD ["node", "apps/worker/dist/index.js"]
+
+# ============================================
+# Default: API
+# ============================================
+FROM api
