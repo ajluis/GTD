@@ -21,6 +21,16 @@ export {
   queryTasksDueToday,
   queryActiveActions,
   queryAgendaForPerson,
+  queryActiveProjects,
+  queryWaitingTasks,
+  querySomedayTasks,
+  queryTasksByContext,
+  findTaskByText,
+  extractTaskTitle,
+  extractTaskDueDate,
+  extractTaskContext,
+  extractTaskPriority,
+  isTaskDueToday,
   type CreateTaskData,
 } from './services/tasks.js';
 

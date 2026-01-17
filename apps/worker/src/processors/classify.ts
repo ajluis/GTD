@@ -5,8 +5,23 @@ import type { Queue } from 'bullmq';
 import type { DbClient } from '@clarity/database';
 import { users, messages, tasks, people } from '@clarity/database';
 import { eq } from 'drizzle-orm';
-import { createClassifier } from '@clarity/ai';
-import { createNotionClient, createPerson as createNotionPerson } from '@clarity/notion';
+import { createClassifier, findBestFuzzyMatch, formatDidYouMean } from '@clarity/ai';
+import {
+  createNotionClient,
+  createPerson as createNotionPerson,
+  queryTasksDueToday,
+  queryActiveActions,
+  queryActiveProjects,
+  queryWaitingTasks,
+  querySomedayTasks,
+  queryTasksByContext,
+  queryAgendaForPerson,
+  findTaskByText,
+  completeTask,
+  extractTaskTitle,
+  extractTaskDueDate,
+  isTaskDueToday,
+} from '@clarity/notion';
 import {
   isCommand,
   parseCommand,
@@ -15,8 +30,11 @@ import {
   formatProjectFollowup,
   formatWaitingFollowup,
   formatHelp,
+  formatTaskList,
+  formatTaskComplete,
 } from '@clarity/gtd';
 import type { PersonForMatching, ClassificationResult } from '@clarity/shared-types';
+import { handleIntent, type HandlerContext } from '../handlers/intents.js';
 
 /**
  * Classification Processor
@@ -76,6 +94,43 @@ export function createClassifyProcessor(
       dayOfWeek: p.dayOfWeek,
     }));
 
+    // 2b. Check if message is just a person's name (show their agenda)
+    const contentLower = content.trim().toLowerCase();
+    const matchedPerson = userPeople.find(
+      (p) =>
+        p.name.toLowerCase() === contentLower ||
+        p.aliases?.some((a) => a.toLowerCase() === contentLower)
+    );
+
+    if (matchedPerson) {
+      const response = await handleCommand('show_person_agenda', [matchedPerson.name], user, db);
+      if (response) {
+        await enqueueOutboundMessage(messageQueue, {
+          userId,
+          toNumber: user.phoneNumber,
+          content: response,
+        });
+        return { success: true, type: 'command', command: 'show_person_agenda' };
+      }
+    }
+
+    // 2c. Try fuzzy matching if no exact match and message looks like a name
+    if (!matchedPerson && content.trim().split(/\s+/).length <= 3) {
+      const fuzzyMatch = findBestFuzzyMatch(content.trim(), peopleForMatching, 0.7);
+
+      if (fuzzyMatch && fuzzyMatch.distance > 0) {
+        // Found a fuzzy match - ask for confirmation
+        const confirmMessage = formatDidYouMean(fuzzyMatch);
+        await enqueueOutboundMessage(messageQueue, {
+          userId,
+          toNumber: user.phoneNumber,
+          content: confirmMessage,
+        });
+        // TODO: Store conversation state to handle "yes" response
+        return { success: true, type: 'fuzzy_match', suggestion: fuzzyMatch.person.name };
+      }
+    }
+
     // 4. Classify with Gemini
     const classification = await classifier.classify(content, peopleForMatching);
 
@@ -90,11 +145,42 @@ export function createClassifyProcessor(
     // 6. Handle based on classification type
     let response: string;
 
-    if (classification.type === 'command') {
-      // Command detected by AI
+    if (classification.type === 'intent' && classification.intent) {
+      // Intent detected by AI - use new intent handler system
+      console.log(`[Classify] AI detected intent: ${classification.intent.intent}`);
+
+      const handlerContext: HandlerContext = {
+        user: {
+          id: user.id,
+          phoneNumber: user.phoneNumber,
+          notionAccessToken: user.notionAccessToken,
+          notionTasksDatabaseId: user.notionTasksDatabaseId,
+          notionPeopleDatabaseId: user.notionPeopleDatabaseId,
+          timezone: user.timezone,
+          digestTime: user.digestTime,
+          meetingReminderHours: user.meetingReminderHours,
+          status: user.status,
+          totalTasksCaptured: user.totalTasksCaptured,
+          totalTasksCompleted: user.totalTasksCompleted,
+        },
+        db,
+        messageQueue,
+      };
+
+      response = await handleIntent(classification.intent, handlerContext);
+    } else if (classification.type === 'command') {
+      // Legacy command support (for backwards compatibility)
+      const commandArgs: string[] = [];
+
+      if (classification.command === 'context' && classification.context) {
+        commandArgs.push(classification.context);
+      }
+
+      console.log(`[Classify] Legacy command: ${classification.command}`);
+
       response = await handleCommand(
         classification.command ?? 'help',
-        [],
+        commandArgs,
         user,
         db
       );
@@ -143,21 +229,129 @@ async function handleCommand(
     case 'help':
       return formatHelp();
 
-    case 'today':
-      // TODO: Query tasks from Notion and format
-      return "🔥 TODAY:\n• (Coming soon - Notion queries)\n\nText 'help' for commands.";
+    case 'today': {
+      if (!user.notionAccessToken || !user.notionTasksDatabaseId) {
+        return "🔥 TODAY:\nConnect Notion first to see your tasks.";
+      }
 
-    case 'actions':
-      return "✅ ACTIONS:\n• (Coming soon - Notion queries)\n\nText 'help' for commands.";
+      try {
+        const notion = createNotionClient(user.notionAccessToken);
+        const tasks = await queryTasksDueToday(notion, user.notionTasksDatabaseId);
 
-    case 'projects':
-      return "📁 PROJECTS:\n• (Coming soon - Notion queries)\n\nText 'help' for commands.";
+        if (tasks.length === 0) {
+          return "🔥 TODAY:\nNo tasks due today! 🎉\n\nText something to capture a task.";
+        }
 
-    case 'waiting':
-      return "⏳ WAITING:\n• (Coming soon - Notion queries)\n\nText 'help' for commands.";
+        const formatted = tasks.map((t) => ({
+          title: extractTaskTitle(t),
+          detail: extractTaskDueDate(t) === new Date().toISOString().split('T')[0] ? undefined : 'due soon',
+        }));
 
-    case 'someday':
-      return "💭 SOMEDAY:\n• (Coming soon - Notion queries)\n\nText 'help' for commands.";
+        return formatTaskList('🔥 TODAY:', formatted);
+      } catch (error) {
+        console.error('[Command:today] Error querying Notion:', error);
+        return "🔥 TODAY:\nCouldn't fetch tasks. Try again later.";
+      }
+    }
+
+    case 'actions': {
+      if (!user.notionAccessToken || !user.notionTasksDatabaseId) {
+        return "✅ ACTIONS:\nConnect Notion first to see your tasks.";
+      }
+
+      try {
+        const notion = createNotionClient(user.notionAccessToken);
+        const tasks = await queryActiveActions(notion, user.notionTasksDatabaseId);
+
+        if (tasks.length === 0) {
+          return "✅ ACTIONS:\nNo active actions.\n\nText something to capture a task.";
+        }
+
+        const formatted = tasks.slice(0, 10).map((t) => ({
+          title: extractTaskTitle(t),
+        }));
+
+        const suffix = tasks.length > 10 ? `\n\n(+${tasks.length - 10} more)` : '';
+        return formatTaskList('✅ ACTIONS:', formatted) + suffix;
+      } catch (error) {
+        console.error('[Command:actions] Error querying Notion:', error);
+        return "✅ ACTIONS:\nCouldn't fetch tasks. Try again later.";
+      }
+    }
+
+    case 'projects': {
+      if (!user.notionAccessToken || !user.notionTasksDatabaseId) {
+        return "📁 PROJECTS:\nConnect Notion first to see your projects.";
+      }
+
+      try {
+        const notion = createNotionClient(user.notionAccessToken);
+        const tasks = await queryActiveProjects(notion, user.notionTasksDatabaseId);
+
+        if (tasks.length === 0) {
+          return "📁 PROJECTS:\nNo active projects.\n\nCapture one by texting 'Project: [name]'";
+        }
+
+        const formatted = tasks.map((t) => ({
+          title: extractTaskTitle(t),
+        }));
+
+        return formatTaskList('📁 PROJECTS:', formatted);
+      } catch (error) {
+        console.error('[Command:projects] Error querying Notion:', error);
+        return "📁 PROJECTS:\nCouldn't fetch projects. Try again later.";
+      }
+    }
+
+    case 'waiting': {
+      if (!user.notionAccessToken || !user.notionTasksDatabaseId) {
+        return "⏳ WAITING:\nConnect Notion first to see your waiting items.";
+      }
+
+      try {
+        const notion = createNotionClient(user.notionAccessToken);
+        const tasks = await queryWaitingTasks(notion, user.notionTasksDatabaseId);
+
+        if (tasks.length === 0) {
+          return "⏳ WAITING:\nNothing waiting on others.\n\nCapture with 'Waiting on [person] for [thing]'";
+        }
+
+        const formatted = tasks.map((t) => ({
+          title: extractTaskTitle(t),
+          detail: extractTaskDueDate(t) ? `due ${extractTaskDueDate(t)}` : undefined,
+        }));
+
+        return formatTaskList('⏳ WAITING:', formatted);
+      } catch (error) {
+        console.error('[Command:waiting] Error querying Notion:', error);
+        return "⏳ WAITING:\nCouldn't fetch tasks. Try again later.";
+      }
+    }
+
+    case 'someday': {
+      if (!user.notionAccessToken || !user.notionTasksDatabaseId) {
+        return "💭 SOMEDAY:\nConnect Notion first to see your someday list.";
+      }
+
+      try {
+        const notion = createNotionClient(user.notionAccessToken);
+        const tasks = await querySomedayTasks(notion, user.notionTasksDatabaseId);
+
+        if (tasks.length === 0) {
+          return "💭 SOMEDAY:\nNo someday items yet.\n\nCapture ideas with 'Someday: [idea]'";
+        }
+
+        const formatted = tasks.slice(0, 10).map((t) => ({
+          title: extractTaskTitle(t),
+        }));
+
+        const suffix = tasks.length > 10 ? `\n\n(+${tasks.length - 10} more)` : '';
+        return formatTaskList('💭 SOMEDAY:', formatted) + suffix;
+      } catch (error) {
+        console.error('[Command:someday] Error querying Notion:', error);
+        return "💭 SOMEDAY:\nCouldn't fetch tasks. Try again later.";
+      }
+    }
 
     case 'meetings':
     case 'people': {
@@ -319,17 +513,176 @@ async function handleCommand(
       return `✅ ${person.name} now meets ${scheduleStr}`;
     }
 
-    case 'context':
+    case 'context': {
       const ctx = args[0];
-      return `📍 @${ctx}:\n• (Coming soon - Notion queries)\n\nText 'help' for commands.`;
+      if (!ctx) {
+        return "Please specify a context: @work, @home, @errands, @calls, @computer";
+      }
 
-    case 'done':
+      if (!user.notionAccessToken || !user.notionTasksDatabaseId) {
+        return `📍 @${ctx}:\nConnect Notion first to see your tasks.`;
+      }
+
+      try {
+        const notion = createNotionClient(user.notionAccessToken);
+        const tasks = await queryTasksByContext(notion, user.notionTasksDatabaseId, ctx);
+
+        if (tasks.length === 0) {
+          return `📍 @${ctx}:\nNo tasks in this context.\n\nCapture one by adding @${ctx} to your message.`;
+        }
+
+        const formatted = tasks.slice(0, 10).map((t) => ({
+          title: extractTaskTitle(t),
+        }));
+
+        const suffix = tasks.length > 10 ? `\n\n(+${tasks.length - 10} more)` : '';
+        return formatTaskList(`📍 @${ctx}:`, formatted) + suffix;
+      } catch (error) {
+        console.error(`[Command:context:${ctx}] Error querying Notion:`, error);
+        return `📍 @${ctx}:\nCouldn't fetch tasks. Try again later.`;
+      }
+    }
+
+    case 'done': {
       const searchText = args.join(' ');
-      return `Looking for "${searchText}"...\n\n(Task completion coming soon)`;
+      if (!searchText) {
+        return "What did you complete? Try 'done [task text]'";
+      }
 
-    case 'done_with':
+      if (!user.notionAccessToken || !user.notionTasksDatabaseId) {
+        return "Connect Notion first to mark tasks complete.";
+      }
+
+      try {
+        const notion = createNotionClient(user.notionAccessToken);
+        const matchingTasks = await findTaskByText(notion, user.notionTasksDatabaseId, searchText);
+
+        if (matchingTasks.length === 0) {
+          return `No matching task found for "${searchText}".\n\nTry a different search term.`;
+        }
+
+        if (matchingTasks.length === 1) {
+          // Exact match - complete it
+          const task = matchingTasks[0]!;
+          const title = extractTaskTitle(task);
+          const wasDueToday = isTaskDueToday(task);
+
+          await completeTask(notion, task.id);
+
+          // Update local DB stats
+          await db
+            .update(users)
+            .set({
+              totalTasksCompleted: (user.totalTasksCompleted ?? 0) + 1,
+              updatedAt: new Date(),
+            })
+            .where(eq(users.id, user.id));
+
+          return formatTaskComplete(title, wasDueToday);
+        }
+
+        // Multiple matches - ask user to be more specific
+        const options = matchingTasks.slice(0, 3).map((t, i) => `${i + 1}. ${extractTaskTitle(t)}`);
+        return `Found ${matchingTasks.length} matching tasks:\n${options.join('\n')}\n\nBe more specific or reply with number.`;
+      } catch (error) {
+        console.error('[Command:done] Error completing task:', error);
+        return "Couldn't complete task. Try again later.";
+      }
+    }
+
+    case 'done_with': {
       const personName = args[0];
-      return `Processing agenda items for ${personName}...\n\n(Post-meeting flow coming soon)`;
+      if (!personName) {
+        return "Who did you meet with? Try 'done with [name]'";
+      }
+
+      // Look up person in user's people list
+      const allPeople = await db.query.people.findMany({
+        where: eq(people.userId, user.id),
+      });
+
+      const person = allPeople.find(
+        (p) =>
+          p.name.toLowerCase() === personName.toLowerCase() ||
+          p.aliases?.some((a) => a.toLowerCase() === personName.toLowerCase())
+      );
+
+      if (!person) {
+        return `I don't have "${personName}" in your people list.\n\nAdd them with 'add person ${personName}'`;
+      }
+
+      if (!user.notionAccessToken || !user.notionTasksDatabaseId || !person.notionPageId) {
+        return "Connect Notion first to process agenda items.";
+      }
+
+      try {
+        const notion = createNotionClient(user.notionAccessToken);
+        const agendaItems = await queryAgendaForPerson(notion, user.notionTasksDatabaseId, person.notionPageId);
+
+        if (agendaItems.length === 0) {
+          return `✅ No pending agenda items for ${person.name}.\n\nGreat meeting! 🎉`;
+        }
+
+        // For now, list items and mark all as discussed
+        // TODO: Implement multi-turn conversation for item-by-item processing
+        const itemTitles = agendaItems.map((item, i) => `${i + 1}. ${extractTaskTitle(item)}`);
+
+        // Mark all as discussed
+        const { markDiscussed } = await import('@clarity/notion');
+        for (const item of agendaItems) {
+          await markDiscussed(notion, item.id);
+        }
+
+        return `👥 ${person.name} - ${agendaItems.length} items discussed:\n${itemTitles.join('\n')}\n\n✅ All marked as discussed!`;
+      } catch (error) {
+        console.error('[Command:done_with] Error processing agenda:', error);
+        return "Couldn't process agenda items. Try again later.";
+      }
+    }
+
+    case 'show_person_agenda': {
+      // This handles when user just texts a person's name
+      const personName = args[0];
+      if (!personName) {
+        return formatHelp();
+      }
+
+      const allPeople = await db.query.people.findMany({
+        where: eq(people.userId, user.id),
+      });
+
+      const person = allPeople.find(
+        (p) =>
+          p.name.toLowerCase() === personName.toLowerCase() ||
+          p.aliases?.some((a) => a.toLowerCase() === personName.toLowerCase())
+      );
+
+      if (!person) {
+        return formatHelp(); // Not a known person name
+      }
+
+      if (!user.notionAccessToken || !user.notionTasksDatabaseId || !person.notionPageId) {
+        return `👤 ${person.name}\n\nConnect Notion first to see agenda items.`;
+      }
+
+      try {
+        const notion = createNotionClient(user.notionAccessToken);
+        const agendaItems = await queryAgendaForPerson(notion, user.notionTasksDatabaseId, person.notionPageId);
+
+        if (agendaItems.length === 0) {
+          return `👤 ${person.name}\n\nNo pending agenda items.\n\nAdd one by texting '@${person.name.split(' ')[0]} [topic]'`;
+        }
+
+        const formatted = agendaItems.map((t) => ({
+          title: extractTaskTitle(t),
+        }));
+
+        return formatTaskList(`👤 ${person.name} (${agendaItems.length} pending):`, formatted, true);
+      } catch (error) {
+        console.error('[Command:show_person_agenda] Error:', error);
+        return `👤 ${person.name}\n\nCouldn't fetch agenda items. Try again later.`;
+      }
+    }
 
     default:
       return formatHelp();

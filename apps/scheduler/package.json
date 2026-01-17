@@ -1,0 +1,30 @@
+{
+  "name": "@clarity/scheduler",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@clarity/database": "workspace:*",
+    "@clarity/gtd": "workspace:*",
+    "@clarity/notion": "workspace:*",
+    "@clarity/queue": "workspace:*",
+    "@clarity/shared-types": "workspace:*",
+    "bullmq": "^5.30.0",
+    "drizzle-orm": "^0.38.0",
+    "ioredis": "^5.4.1",
+    "node-cron": "^3.0.3"
+  },
+  "devDependencies": {
+    "@types/node-cron": "^3.0.11",
+    "tsx": "^4.19.0",
+    "typescript": "^5.3.3"
+  }
+}

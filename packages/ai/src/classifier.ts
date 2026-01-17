@@ -1,4 +1,10 @@
-import type { ClassificationResult, PersonForMatching } from '@clarity/shared-types';
+import type {
+  ClassificationResult,
+  PersonForMatching,
+  IntentResult,
+  IntentType,
+  IntentEntities,
+} from '@clarity/shared-types';
 import { GeminiClient, createGeminiClient } from './gemini-client.js';
 import {
   buildClassificationPrompt,
@@ -8,8 +14,9 @@ import {
 /**
  * GTD Message Classifier
  *
- * Uses Gemini AI to classify incoming SMS messages into GTD task types,
- * match person references, and infer context/priority.
+ * Uses Gemini AI to classify incoming SMS messages:
+ * 1. Detect INTENTS (user wants to do something)
+ * 2. Classify TASK CAPTURE (user wants to save something)
  */
 export class GTDClassifier {
   private gemini: GeminiClient;
@@ -24,7 +31,7 @@ export class GTDClassifier {
    * @param message - Raw SMS message text
    * @param people - User's configured people for agenda matching
    * @param currentTime - Current time for date parsing (optional)
-   * @returns Classification result with type, title, context, etc.
+   * @returns Classification result with type, intent, or task details
    */
   async classify(
     message: string,
@@ -61,6 +68,99 @@ export class GTDClassifier {
     raw: RawClassificationResult,
     originalMessage: string
   ): ClassificationResult {
+    // Check if this is an intent response
+    if (raw.type === 'intent' && raw.intent) {
+      return this.normalizeIntentResult(raw, originalMessage);
+    }
+
+    // Otherwise, it's a task capture or unknown
+    return this.normalizeTaskResult(raw, originalMessage);
+  }
+
+  /**
+   * Normalize an intent classification result
+   */
+  private normalizeIntentResult(
+    raw: RawClassificationResult,
+    _originalMessage: string
+  ): ClassificationResult {
+    const rawIntent = raw.intent!;
+
+    // Validate intent type
+    const validIntents = VALID_INTENTS;
+    const intentType = validIntents.includes(rawIntent.intent as IntentType)
+      ? (rawIntent.intent as IntentType)
+      : 'show_help'; // Default to help if unknown intent
+
+    // Normalize confidence
+    const intentConfidence = typeof rawIntent.confidence === 'number'
+      ? Math.max(0, Math.min(1, rawIntent.confidence))
+      : 0.8;
+
+    const overallConfidence = typeof raw.confidence === 'number'
+      ? Math.max(0, Math.min(1, raw.confidence))
+      : intentConfidence;
+
+    // Normalize entities (use bracket notation for index signature access)
+    const entities: IntentEntities = {};
+    const rawEntities = rawIntent.entities ?? {};
+
+    if (rawEntities['taskText']) {
+      entities.taskText = String(rawEntities['taskText']).trim();
+    }
+    if (rawEntities['personName']) {
+      entities.personName = String(rawEntities['personName']).trim();
+    }
+    if (rawEntities['newValue']) {
+      entities.newValue = String(rawEntities['newValue']).trim();
+    }
+    if (rawEntities['context'] && isValidContext(String(rawEntities['context']))) {
+      entities.context = rawEntities['context'] as IntentEntities['context'];
+    }
+    if (rawEntities['priority'] && isValidPriority(String(rawEntities['priority']))) {
+      entities.priority = rawEntities['priority'] as IntentEntities['priority'];
+    }
+    if (rawEntities['dueDate'] && isValidDate(String(rawEntities['dueDate']))) {
+      entities.dueDate = String(rawEntities['dueDate']);
+    }
+    if (rawEntities['taskType'] && isValidTaskType(String(rawEntities['taskType']))) {
+      entities.taskType = rawEntities['taskType'] as IntentEntities['taskType'];
+    }
+    if (rawEntities['dayOfWeek'] && isValidDayOfWeek(String(rawEntities['dayOfWeek']))) {
+      entities.dayOfWeek = rawEntities['dayOfWeek'] as IntentEntities['dayOfWeek'];
+    }
+    if (rawEntities['frequency'] && isValidFrequency(String(rawEntities['frequency']))) {
+      entities.frequency = rawEntities['frequency'] as IntentEntities['frequency'];
+    }
+    if (rawEntities['noteContent']) {
+      entities.noteContent = String(rawEntities['noteContent']).trim();
+    }
+    if (Array.isArray(rawEntities['aliases'])) {
+      entities.aliases = (rawEntities['aliases'] as unknown[]).map((a) => String(a).trim());
+    }
+
+    const intent: IntentResult = {
+      intent: intentType,
+      confidence: intentConfidence,
+      entities,
+      reasoning: rawIntent.reasoning,
+    };
+
+    return {
+      type: 'intent',
+      intent,
+      confidence: overallConfidence,
+      reasoning: rawIntent.reasoning,
+    };
+  }
+
+  /**
+   * Normalize a task capture classification result
+   */
+  private normalizeTaskResult(
+    raw: RawClassificationResult,
+    originalMessage: string
+  ): ClassificationResult {
     // Ensure type is valid
     const validTypes = [
       'action',
@@ -68,7 +168,7 @@ export class GTDClassifier {
       'agenda',
       'waiting',
       'someday',
-      'command',
+      'command', // Legacy support
       'unknown',
     ] as const;
     const type = validTypes.includes(raw.type as any)
@@ -86,7 +186,7 @@ export class GTDClassifier {
       confidence,
     };
 
-    // Add command if present
+    // Legacy command support
     if (type === 'command' && raw.command) {
       result.command = raw.command.toLowerCase().trim();
     }
@@ -133,6 +233,12 @@ export class GTDClassifier {
 interface RawClassificationResult {
   type: string;
   command?: string;
+  intent?: {
+    intent: string;
+    confidence?: number;
+    entities?: Record<string, any>;
+    reasoning?: string;
+  };
   title?: string;
   context?: string;
   priority?: string;
@@ -147,10 +253,62 @@ interface RawClassificationResult {
 }
 
 /**
+ * Valid intent types
+ */
+const VALID_INTENTS: IntentType[] = [
+  // Queries
+  'query_today',
+  'query_actions',
+  'query_projects',
+  'query_waiting',
+  'query_someday',
+  'query_context',
+  'query_people',
+  'query_person_agenda',
+  // Completion
+  'complete_task',
+  'complete_recent',
+  'complete_person_agenda',
+  // People management
+  'add_person',
+  'remove_person',
+  'set_alias',
+  'set_schedule',
+  // Settings
+  'set_digest_time',
+  'set_timezone',
+  'set_reminder_hours',
+  'pause_account',
+  'resume_account',
+  'show_settings',
+  // Task editing
+  'reschedule_task',
+  'set_task_priority',
+  'set_task_context',
+  'add_task_note',
+  'rename_task',
+  'delete_task',
+  'assign_task_person',
+  // Corrections
+  'undo_last',
+  'change_task_type',
+  'correct_person',
+  // Bulk
+  'clear_person_agenda',
+  'complete_all_today',
+  // Info
+  'show_stats',
+  'show_help',
+];
+
+/**
  * Validation helpers
  */
 const VALID_CONTEXTS = ['work', 'home', 'errands', 'calls', 'computer', 'anywhere'] as const;
 const VALID_PRIORITIES = ['today', 'this_week', 'soon'] as const;
+const VALID_TASK_TYPES = ['action', 'project', 'waiting', 'someday', 'agenda'] as const;
+const VALID_DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const;
+const VALID_FREQUENCIES = ['daily', 'weekly', 'biweekly', 'monthly', 'as_needed'] as const;
 
 function isValidContext(context: string): boolean {
   return VALID_CONTEXTS.includes(context as any);
@@ -158,6 +316,18 @@ function isValidContext(context: string): boolean {
 
 function isValidPriority(priority: string): boolean {
   return VALID_PRIORITIES.includes(priority as any);
+}
+
+function isValidTaskType(taskType: string): boolean {
+  return VALID_TASK_TYPES.includes(taskType as any);
+}
+
+function isValidDayOfWeek(day: string): boolean {
+  return VALID_DAYS.includes(day.toLowerCase() as any);
+}
+
+function isValidFrequency(frequency: string): boolean {
+  return VALID_FREQUENCIES.includes(frequency as any);
 }
 
 function isValidDate(date: string): boolean {

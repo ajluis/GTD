@@ -33,15 +33,23 @@ export type MessageStatus = 'pending' | 'sent' | 'delivered' | 'failed' | 'recei
 /**
  * AI Classification Result
  * Output from Gemini when classifying an incoming SMS
+ *
+ * Can be one of three categories:
+ * 1. Task capture (action, project, waiting, someday, agenda)
+ * 2. Intent (user wants to do something - query, edit, settings, etc.)
+ * 3. Unknown (low confidence, needs clarification)
  */
 export interface ClassificationResult {
-  /** Classified task type */
-  type: TaskType | 'command' | 'unknown';
+  /** Classified type: task type, 'intent', or 'unknown' */
+  type: TaskType | 'intent' | 'command' | 'unknown';
 
-  /** Detected command (if type is 'command') */
+  /** Detected command (legacy - for backwards compatibility) */
   command?: string;
 
-  /** Cleaned/parsed task title */
+  /** Intent detection result (if type is 'intent') */
+  intent?: IntentResult;
+
+  /** Cleaned/parsed task title (for task capture) */
   title?: string;
 
   /** Inferred context */
@@ -86,7 +94,7 @@ export interface ConversationState {
 }
 
 /**
- * SMS Command Types
+ * SMS Command Types (legacy - being replaced by IntentType)
  */
 export type SMSCommand =
   | 'today'
@@ -112,4 +120,96 @@ export interface PersonForMatching {
   aliases: string[];
   frequency: MeetingFrequency | null;
   dayOfWeek: DayOfWeek | null;
+}
+
+/**
+ * Intent Types
+ * All possible user intents that the LLM can detect
+ */
+export type IntentType =
+  // Queries - user wants to SEE information
+  | 'query_today'
+  | 'query_actions'
+  | 'query_projects'
+  | 'query_waiting'
+  | 'query_someday'
+  | 'query_context'
+  | 'query_people'
+  | 'query_person_agenda'
+  // Task completion - user wants to MARK something done
+  | 'complete_task'
+  | 'complete_recent'
+  | 'complete_person_agenda'
+  // People management - user wants to MANAGE people
+  | 'add_person'
+  | 'remove_person'
+  | 'set_alias'
+  | 'set_schedule'
+  // Settings - user wants to CHANGE preferences
+  | 'set_digest_time'
+  | 'set_timezone'
+  | 'set_reminder_hours'
+  | 'pause_account'
+  | 'resume_account'
+  | 'show_settings'
+  // Task editing - user wants to MODIFY an existing task
+  | 'reschedule_task'
+  | 'set_task_priority'
+  | 'set_task_context'
+  | 'add_task_note'
+  | 'rename_task'
+  | 'delete_task'
+  | 'assign_task_person'
+  // Corrections - user wants to FIX a recent action
+  | 'undo_last'
+  | 'change_task_type'
+  | 'correct_person'
+  // Bulk operations
+  | 'clear_person_agenda'
+  | 'complete_all_today'
+  // Information
+  | 'show_stats'
+  | 'show_help';
+
+/**
+ * Entities extracted from user message for intent handling
+ */
+export interface IntentEntities {
+  /** Task text for searching (e.g., "dentist call") */
+  taskText?: string;
+  /** Person name for people operations */
+  personName?: string;
+  /** New value for updates (time, timezone, alias, etc.) */
+  newValue?: string;
+  /** Context for context operations */
+  context?: TaskContext;
+  /** Priority for priority operations */
+  priority?: TaskPriority;
+  /** Due date for scheduling */
+  dueDate?: string;
+  /** Task type for type changes */
+  taskType?: TaskType;
+  /** Day of week for schedule setting */
+  dayOfWeek?: DayOfWeek;
+  /** Meeting frequency for schedule setting */
+  frequency?: MeetingFrequency;
+  /** Note content for adding notes */
+  noteContent?: string;
+  /** Aliases for alias setting */
+  aliases?: string[];
+}
+
+/**
+ * Intent detection result
+ * Returned when user wants to DO something (not capture a task)
+ */
+export interface IntentResult {
+  /** The detected intent */
+  intent: IntentType;
+  /** Confidence in the intent detection (0-1) */
+  confidence: number;
+  /** Extracted entities from the message */
+  entities: IntentEntities;
+  /** AI reasoning for the intent detection */
+  reasoning?: string;
 }

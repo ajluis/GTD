@@ -119,11 +119,31 @@ export function formatClarification(classification: ClassificationResult): strin
 /**
  * Format task completion response
  */
-export function formatTaskComplete(title: string, wasDueToday?: boolean): string {
+export function formatTaskComplete(
+  title: string,
+  wasDueToday?: boolean,
+  stats?: { todayCount?: number; totalCount?: number }
+): string {
   let response = `✅ ${truncate(title, 40)} — done!`;
 
   if (wasDueToday) {
     response += '\nNice timing! 🎉';
+  }
+
+  // Add streak messages
+  if (stats?.todayCount && stats.todayCount >= 3) {
+    response += `\n🔥 ${stats.todayCount} tasks today!`;
+  }
+
+  // Add milestone messages
+  if (stats?.totalCount) {
+    const milestones = [10, 25, 50, 100, 250, 500, 1000];
+    for (const milestone of milestones) {
+      if (stats.totalCount === milestone) {
+        response += `\n🏆 ${milestone} tasks captured!`;
+        break;
+      }
+    }
   }
 
   return response;

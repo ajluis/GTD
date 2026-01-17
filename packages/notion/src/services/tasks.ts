@@ -207,3 +207,149 @@ export async function queryAgendaForPerson(
     ],
   });
 }
+
+/**
+ * Query active projects (not done)
+ */
+export async function queryActiveProjects(
+  notion: Client,
+  databaseId: string
+): Promise<any[]> {
+  return queryTasks(notion, databaseId, {
+    and: [
+      { property: 'Type', select: { equals: 'Project' } },
+      { property: 'Status', status: { does_not_equal: 'Done' } },
+    ],
+  });
+}
+
+/**
+ * Query waiting tasks (not done)
+ */
+export async function queryWaitingTasks(
+  notion: Client,
+  databaseId: string
+): Promise<any[]> {
+  return queryTasks(notion, databaseId, {
+    and: [
+      { property: 'Type', select: { equals: 'Waiting' } },
+      { property: 'Status', status: { does_not_equal: 'Done' } },
+    ],
+  });
+}
+
+/**
+ * Query someday tasks
+ */
+export async function querySomedayTasks(
+  notion: Client,
+  databaseId: string
+): Promise<any[]> {
+  return queryTasks(notion, databaseId, {
+    property: 'Type',
+    select: { equals: 'Someday' },
+  });
+}
+
+/**
+ * Query tasks by context
+ */
+export async function queryTasksByContext(
+  notion: Client,
+  databaseId: string,
+  context: string
+): Promise<any[]> {
+  // Map internal context to Notion format
+  const notionContext = `@${context}`;
+
+  return queryTasks(notion, databaseId, {
+    and: [
+      { property: 'Context', select: { equals: notionContext } },
+      { property: 'Status', status: { does_not_equal: 'Done' } },
+    ],
+  });
+}
+
+/**
+ * Find tasks by text search (for "done [text]" command)
+ * Searches title for matching text
+ */
+export async function findTaskByText(
+  notion: Client,
+  databaseId: string,
+  searchText: string
+): Promise<any[]> {
+  // Query all non-done tasks and filter locally
+  // Notion API doesn't support full-text search on title
+  const tasks = await queryTasks(notion, databaseId, {
+    property: 'Status',
+    status: { does_not_equal: 'Done' },
+  });
+
+  // Filter by text match (case-insensitive)
+  const searchLower = searchText.toLowerCase();
+  return tasks.filter((task) => {
+    const title = extractTaskTitle(task);
+    return title.toLowerCase().includes(searchLower);
+  });
+}
+
+/**
+ * Extract title from a Notion task page
+ */
+export function extractTaskTitle(page: any): string {
+  try {
+    const titleProperty = page.properties?.Task?.title;
+    if (Array.isArray(titleProperty) && titleProperty.length > 0) {
+      return titleProperty[0]?.plain_text ?? '';
+    }
+    return '';
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Extract due date from a Notion task page
+ */
+export function extractTaskDueDate(page: any): string | null {
+  try {
+    return page.properties?.Due?.date?.start ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Extract context from a Notion task page
+ */
+export function extractTaskContext(page: any): string | null {
+  try {
+    const context = page.properties?.Context?.select?.name;
+    return context ? context.replace('@', '') : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Extract priority from a Notion task page
+ */
+export function extractTaskPriority(page: any): string | null {
+  try {
+    return page.properties?.Priority?.select?.name ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Check if a task was due today
+ */
+export function isTaskDueToday(page: any): boolean {
+  const dueDate = extractTaskDueDate(page);
+  if (!dueDate) return false;
+
+  const today = new Date().toISOString().split('T')[0];
+  return dueDate === today;
+}
