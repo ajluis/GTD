@@ -87,6 +87,9 @@ importers:
       '@clarity/shared-types':
         specifier: workspace:*
         version: link:../../packages/shared-types
+      '@clarity/todoist':
+        specifier: workspace:*
+        version: link:../../packages/todoist
       bullmq:
         specifier: ^5.30.0
         version: 5.66.5
@@ -189,6 +192,19 @@ importers:
     devDependencies:
       typescript:
         specifier: ^5.3.3
+        version: 5.9.3
+
+  packages/todoist:
+    dependencies:
+      '@clarity/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
+    devDependencies:
+      '@types/node':
+        specifier: ^20.10.0
+        version: 20.19.30
+      typescript:
+        specifier: ^5.3.0
         version: 5.9.3
 
 packages:
