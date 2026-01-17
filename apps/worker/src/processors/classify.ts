@@ -210,13 +210,17 @@ async function handleCommand(
         return `👤 ${name} already exists in your people list.`;
       }
 
+      // Create label name from person name (lowercase, underscores)
+      const labelName = name.toLowerCase().replace(/\s+/g, '_');
+
       await db.insert(people).values({
         userId: user.id,
         name,
+        todoistLabel: labelName,
         active: true,
       });
 
-      return `✅ Added ${name} to your people.\n\nOptional next steps:\n• 'alias ${name} = nickname1, nickname2'\n• '${name} meets weekly on Tuesday'`;
+      return `✅ Added ${name} to your people.\n📍 Agenda items will use label: ${labelName}\n\nOptional:\n• 'alias ${name} = nickname1, nickname2'\n• '${name} meets weekly on Tuesday'`;
     }
 
     case 'remove_person': {

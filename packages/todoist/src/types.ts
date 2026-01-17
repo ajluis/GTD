@@ -5,10 +5,12 @@ export interface CreateTaskData {
   content: string;
   description?: string;
   projectId?: string;
+  project_id?: string; // Todoist API uses snake_case
   labels?: string[];
   priority?: 1 | 2 | 3 | 4; // 4 = urgent, 1 = normal
   dueString?: string;
   dueDate?: string;
+  due_date?: string; // Todoist API uses snake_case
 }
 
 /**

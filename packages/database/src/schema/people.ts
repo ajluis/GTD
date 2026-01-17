@@ -40,8 +40,11 @@ export const people = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
 
-    /** Notion page ID for sync */
+    /** Notion page ID for sync (legacy) */
     notionPageId: text('notion_page_id').unique(),
+
+    /** Todoist label name for this person's agenda items */
+    todoistLabel: text('todoist_label'),
 
     // Person Details
     /** Person or meeting name */

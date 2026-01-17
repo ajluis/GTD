@@ -47,6 +47,7 @@ export async function createTask(
     dueDate?: string | null;
     personName?: string | null;
     notes?: string | null;
+    personLabel?: string | null;
   }
 ): Promise<string> {
   // Build labels array
@@ -60,23 +61,19 @@ export async function createTask(
     labels.push(CONTEXT_TO_LABEL[data.context]);
   }
 
-  // Build task content
-  let content = data.title;
-
-  // Add person name for agenda items
-  if (data.type === 'agenda' && data.personName) {
-    content = `${data.title} [${data.personName}]`;
+  // Add person label for agenda items
+  if (data.personLabel) {
+    // Convert to lowercase, replace spaces with underscores for valid label
+    labels.push(data.personLabel.toLowerCase().replace(/\s+/g, '_'));
   }
+
+  // Build task content
+  const content = data.title;
 
   // Build description
   let description = '';
   if (data.notes) {
     description = data.notes;
-  }
-  if (data.personName && data.type === 'agenda') {
-    description = description
-      ? `${description}\n\nPerson: ${data.personName}`
-      : `Person: ${data.personName}`;
   }
 
   const taskData: CreateTaskData = {
@@ -84,12 +81,12 @@ export async function createTask(
     labels,
     ...(description && { description }),
     ...(data.priority && { priority: PRIORITY_TO_TODOIST[data.priority] }),
-    ...(data.dueDate && { dueDate: data.dueDate }),
+    ...(data.dueDate && { due_date: data.dueDate }),
   };
 
   const task = await client.post<TodoistTask>('/tasks', taskData);
 
-  console.log(`[Todoist] Created task: ${task.id} - ${content}`);
+  console.log(`[Todoist] Created task: ${task.id} - ${content} [${labels.join(', ')}]`);
 
   return task.id;
 }
@@ -121,4 +118,33 @@ export async function getLabels(
   client: TodoistClient
 ): Promise<TodoistLabel[]> {
   return client.get<TodoistLabel[]>('/labels');
+}
+
+/**
+ * Create a new project
+ */
+export async function createProject(
+  client: TodoistClient,
+  name: string,
+  color?: string
+): Promise<TodoistProject> {
+  const project = await client.post<TodoistProject>('/projects', {
+    name,
+    ...(color && { color }),
+  });
+
+  console.log(`[Todoist] Created project: ${project.id} - ${name}`);
+
+  return project;
+}
+
+/**
+ * Delete a project
+ */
+export async function deleteProject(
+  client: TodoistClient,
+  projectId: string
+): Promise<void> {
+  await client.delete(`/projects/${projectId}`);
+  console.log(`[Todoist] Deleted project: ${projectId}`);
 }

@@ -28,13 +28,15 @@ export function createTodoistSyncProcessor(db: DbClient) {
       throw new Error(`Task not found: ${taskId}`);
     }
 
-    // 2. Get person name if applicable
+    // 2. Get person details if applicable
     let personName: string | null = null;
+    let personLabel: string | null = null;
     if (task.personId) {
       const person = await db.query.people.findFirst({
         where: eq(people.id, task.personId),
       });
       personName = person?.name ?? null;
+      personLabel = person?.todoistLabel ?? person?.name ?? null;
     }
 
     // 3. Create in Todoist
@@ -49,6 +51,7 @@ export function createTodoistSyncProcessor(db: DbClient) {
         dueDate: task.dueDate,
         personName,
         notes: task.notes,
+        personLabel,
       });
 
       console.log(`[TodoistSync] Created Todoist task: ${todoistTaskId}`);
