@@ -111,14 +111,13 @@ export class SendblueClient {
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
 
-    // Sendblue uses API key + secret as basic auth
-    const authHeader = Buffer.from(`${this.apiKey}:${this.apiSecret}`).toString('base64');
-
+    // Sendblue uses custom headers for authentication
     const response = await fetch(url, {
       ...options,
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Basic ${authHeader}`,
+        'sb-api-key-id': this.apiKey,
+        'sb-api-secret-key': this.apiSecret,
         ...options.headers,
       },
     });
