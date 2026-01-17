@@ -49,7 +49,7 @@ export async function enqueueInboundMessage(
     'inbound',
     { type: 'inbound', ...data },
     {
-      jobId: `inbound:${data.messageHandle}`, // Idempotency key
+      jobId: `inbound-${data.messageHandle}`, // Idempotency key
     }
   );
   return job.id!;
@@ -66,7 +66,7 @@ export async function enqueueClassification(
     'classify',
     { type: 'classify', ...data },
     {
-      jobId: `classify:${data.messageId}`,
+      jobId: `classify-${data.messageId}`,
     }
   );
   return job.id!;
@@ -83,7 +83,7 @@ export async function enqueueNotionSync(
     'notion-sync',
     { type: 'notion-sync', ...data },
     {
-      jobId: `notion-sync:${data.taskId}`,
+      jobId: `notion-sync-${data.taskId}`,
       attempts: 5, // More retries for Notion API
       backoff: {
         type: 'exponential',
