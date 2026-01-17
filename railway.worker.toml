@@ -1,0 +1,14 @@
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "./Dockerfile"
+
+# Use the worker target from the multi-stage Dockerfile
+[build.buildArgs]
+# Note: Set RAILWAY_DOCKERFILE_TARGET=worker in service settings
+
+[deploy]
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
+
+# No health check - worker is a background processor without HTTP server
+# healthcheckPath is intentionally omitted
