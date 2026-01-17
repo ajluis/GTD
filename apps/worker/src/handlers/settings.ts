@@ -138,9 +138,19 @@ export async function handleSetTimezone(
   // Try to resolve timezone
   let timezone: string | null = null;
 
-  // Check our mappings first
+  // Check our mappings first (exact match)
   if (TIMEZONE_MAPPINGS[tzValue]) {
     timezone = TIMEZONE_MAPPINGS[tzValue]!;
+  }
+
+  // Try partial matching - look for known keys within the input
+  if (!timezone) {
+    for (const [key, tz] of Object.entries(TIMEZONE_MAPPINGS)) {
+      if (tzValue.includes(key) || key.includes(tzValue)) {
+        timezone = tz;
+        break;
+      }
+    }
   }
 
   // Check if it's already a valid IANA timezone

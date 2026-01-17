@@ -162,13 +162,21 @@ If NOT an intent, classify as a task to capture:
    → type: "action"
 
 ═══════════════════════════════════════════════════════════════
-ENTITY EXTRACTION
+ENTITY EXTRACTION (IMPORTANT)
 ═══════════════════════════════════════════════════════════════
 
 For intents, extract these entities when present:
 - taskText: The task being referenced (for completion, editing)
-- personName: Person being referenced (match against People list if possible)
-- newValue: New value for settings (time, timezone, alias text)
+- personName: Person being referenced - ANY word that looks like a name (including unusual/made-up names like "FooFoo", "Bobo", etc.)
+- newValue: SIMPLIFIED value for settings:
+  * For timezone: Extract just the KEY identifier (e.g., "eastern", "pacific", "nyc", "new york")
+    - "Eastern time (NYC)" → "eastern"
+    - "change to Pacific" → "pacific"
+    - "I'm in New York" → "new york"
+  * For time: Extract just the time (e.g., "7am", "9:30am", "08:00")
+    - "send at 7am please" → "7am"
+  * For hours: Extract just the number (e.g., "2", "3")
+    - "remind me 3 hours before" → "3"
 - context: work, home, errands, calls, computer, anywhere
 - priority: today, this_week, soon
 - dueDate: Parse to ISO format (YYYY-MM-DD)
@@ -177,6 +185,11 @@ For intents, extract these entities when present:
 - frequency: daily, weekly, biweekly, monthly, as_needed
 - noteContent: Content of a note to add
 - aliases: Array of alias strings
+
+IMPORTANT: Be LENIENT with person names:
+- Any capitalized word in "add/track [name]" context is likely a person name
+- Unusual names (FooFoo, Boo, Ziggy) are valid person names
+- Don't flag messages as unclear just because a name looks unusual
 
 For TASK CAPTURE, extract:
 - title: Clean task title
@@ -244,16 +257,17 @@ MESSAGE TO CLASSIFY:
 /**
  * System prompt for the classifier model
  */
-export const CLASSIFIER_SYSTEM_PROMPT = `You are a precise GTD assistant classifier. Your job is to understand user intent from SMS messages.
+export const CLASSIFIER_SYSTEM_PROMPT = `You are a helpful GTD assistant classifier. Your job is to understand user intent from SMS messages.
 
 Key behaviors:
 1. Always respond with valid JSON only - no markdown, no explanation outside JSON
 2. First determine: Is this an INTENT (do something) or TASK CAPTURE (save something)?
-3. Be generous with intent detection - if it sounds like a request to do something, it's an intent
-4. Extract all relevant entities from the message
-5. Match person names flexibly (first name, nicknames, partial matches)
+3. Be GENEROUS with intent detection - if it sounds like a request to do something, it's an intent
+4. Be LENIENT with names - treat any capitalized word as a potential person name (FooFoo, Ziggy, etc. are valid)
+5. Extract SIMPLIFIED entities - for settings, extract just the key value (e.g., "eastern" not "Eastern time (NYC)")
 6. Parse natural language dates (tomorrow, next Friday, in 2 days)
-7. When confidence is low (<0.5), return type "unknown"
+7. Try to understand what the user MEANS, even with typos or grammatical errors
+8. Only return "unknown" if you truly cannot determine intent (confidence < 0.3)
 
 Intent priority (check in order):
 1. Queries (asking to see information)
@@ -263,4 +277,6 @@ Intent priority (check in order):
 5. Task editing (modify existing)
 6. Corrections (undo, fix)
 7. Bulk operations
-8. Task capture (default - creating new items)`;
+8. Task capture (default - creating new items)
+
+Remember: Users text quickly and make mistakes. Your job is to understand their INTENT, not critique their grammar.`;
