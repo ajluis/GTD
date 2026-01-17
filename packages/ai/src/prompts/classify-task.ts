@@ -19,12 +19,15 @@ export interface ConversationMessage {
  * 1. First determine: Is this an INTENT (user wants to do something) or TASK CAPTURE?
  * 2. If INTENT → detect intent type and extract entities
  * 3. If TASK CAPTURE → classify into GTD task types
+ *
+ * @param mode - 'classify' (default) or 'extract' (for re-classification after user clarification)
  */
 export function buildClassificationPrompt(
   message: string,
   people: PersonForMatching[],
   currentTime: Date,
-  conversationHistory: ConversationMessage[] = []
+  conversationHistory: ConversationMessage[] = [],
+  mode: 'classify' | 'extract' = 'classify'
 ): string {
   const peopleList =
     people.length > 0
@@ -353,7 +356,37 @@ FOR UNCLEAR (can't understand at all):
   "confidence": 0.0-0.5,
   "reasoning": "what's unclear"
 }
+${mode === 'extract' ? `
+═══════════════════════════════════════════════════════════════
+EXTRACTION MODE - IMPORTANT
+═══════════════════════════════════════════════════════════════
 
+This message includes user clarification from a follow-up question (after "Additional context:").
+Your job is to EXTRACT fields, NOT ask for more clarification.
+
+Rules:
+1. ALWAYS return a task capture type (action, project, agenda, waiting, someday)
+2. NEVER return needs_clarification - the user already provided clarification
+3. Parse dates from the clarification (e.g., "tuesday" → next Tuesday's date)
+4. Extract person references from both parts of the message
+5. Determine context based on the task action (email/slack → calls, writing → computer)
+6. Set appropriate priority based on timeline mentioned
+
+Example input:
+"Ask Sam on Tuesday to reach out to side shift guys to help them with Sales. Additional context: Our CRO"
+
+Expected output:
+{
+  "type": "agenda",
+  "title": "Ask Sam to reach out to Side Shift guys to help them with Sales",
+  "context": "calls",
+  "priority": "this_week",
+  "dueDate": "YYYY-MM-DD (next Tuesday)",
+  "personMatch": { match to Sam if exists },
+  "confidence": 0.9,
+  "reasoning": "Agenda item for Sam (CRO), due Tuesday"
+}
+` : ''}
 ═══════════════════════════════════════════════════════════════
 MESSAGE TO CLASSIFY:
 ═══════════════════════════════════════════════════════════════

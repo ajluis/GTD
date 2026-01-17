@@ -33,15 +33,17 @@ export class GTDClassifier {
    * @param people - User's configured people for agenda matching
    * @param currentTime - Current time for date parsing (optional)
    * @param conversationHistory - Recent conversation messages for context (optional)
+   * @param mode - 'classify' (default) or 'extract' (for re-classification after clarification)
    * @returns Classification result with type, intent, or task details
    */
   async classify(
     message: string,
     people: PersonForMatching[] = [],
     currentTime: Date = new Date(),
-    conversationHistory: ConversationMessage[] = []
+    conversationHistory: ConversationMessage[] = [],
+    mode: 'classify' | 'extract' = 'classify'
   ): Promise<ClassificationResult> {
-    const prompt = buildClassificationPrompt(message, people, currentTime, conversationHistory);
+    const prompt = buildClassificationPrompt(message, people, currentTime, conversationHistory, mode);
 
     try {
       const result = await this.gemini.generateJSON<RawClassificationResult>(
@@ -227,8 +229,10 @@ export class GTDClassifier {
     }
 
     // Add title (fallback to original message)
+    // Apply defensive cleanup to remove casual prefixes the LLM might have missed
     if (type !== 'command') {
-      result.title = raw.title?.trim() || originalMessage;
+      const rawTitle = raw.title?.trim() || originalMessage;
+      result.title = cleanupTaskTitle(rawTitle);
     }
 
     // Add optional fields if present and valid
@@ -354,6 +358,45 @@ const VALID_FREQUENCIES = ['daily', 'weekly', 'biweekly', 'monthly', 'as_needed'
 
 function isValidContext(context: string): boolean {
   return VALID_CONTEXTS.includes(context as any);
+}
+
+/**
+ * Remove casual prefixes from task titles that the LLM might have missed
+ * This is a defensive cleanup to ensure titles are clean even if the prompt is ignored
+ */
+function cleanupTaskTitle(title: string): string {
+  // Prefixes to remove (case-insensitive)
+  const prefixPatterns = [
+    /^let['']?s\s+/i,
+    /^i\s+need\s+to\s+/i,
+    /^i\s+should\s+/i,
+    /^can\s+you\s+(add\s+)?/i,
+    /^could\s+you\s+(add\s+)?/i,
+    /^we\s+should\s+/i,
+    /^we\s+need\s+to\s+/i,
+    /^you\s+should\s+/i,
+    /^don['']?t\s+forget\s+to\s+/i,
+    /^remember\s+to\s+/i,
+    /^please\s+/i,
+    /^just\s+/i,
+    /^gotta\s+/i,
+    /^need\s+to\s+/i,
+    /^want\s+to\s+/i,
+    /^i\s+want\s+to\s+/i,
+  ];
+
+  let cleaned = title;
+  for (const pattern of prefixPatterns) {
+    cleaned = cleaned.replace(pattern, '');
+  }
+
+  // Capitalize first letter if it's now lowercase
+  const firstChar = cleaned.charAt(0);
+  if (cleaned.length > 0 && firstChar && firstChar !== firstChar.toUpperCase()) {
+    cleaned = firstChar.toUpperCase() + cleaned.slice(1);
+  }
+
+  return cleaned.trim();
 }
 
 function isValidPriority(priority: string): boolean {

@@ -882,11 +882,13 @@ async function handleClarificationResponse(
   }));
 
   // Re-classify to extract all fields
+  // Use 'extract' mode to tell the classifier to extract fields, not ask for more clarification
   const classification = await classifier.classify(
     combinedForClassification,
     peopleForMatching,
     new Date(),
-    []
+    [],
+    'extract' // Extract mode - never return needs_clarification
   );
 
   console.log(`[Clarification] Re-classification result:`, {
