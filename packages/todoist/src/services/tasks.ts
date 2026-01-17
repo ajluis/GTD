@@ -6,12 +6,10 @@ import type { TaskType, TaskContext, TaskPriority } from '@gtd/shared-types';
  * Map GTD context to Todoist label name
  */
 const CONTEXT_TO_LABEL: Record<TaskContext, string> = {
-  work: 'work',
-  home: 'home',
-  errands: 'errands',
-  calls: 'calls',
   computer: 'computer',
-  anywhere: 'anywhere',
+  phone: 'phone',
+  home: 'home',
+  outside: 'outside',
 };
 
 /**

@@ -10,7 +10,7 @@ export type TaskType = 'action' | 'project' | 'waiting' | 'someday' | 'agenda';
 export type TaskStatus = 'pending' | 'synced' | 'completed' | 'discussed' | 'failed';
 
 /** GTD contexts for actions */
-export type TaskContext = 'work' | 'home' | 'errands' | 'calls' | 'computer' | 'anywhere';
+export type TaskContext = 'computer' | 'phone' | 'home' | 'outside';
 
 /** Task priority levels */
 export type TaskPriority = 'today' | 'this_week' | 'soon';
@@ -117,11 +117,10 @@ export type SMSCommand =
   | 'meetings'
   | 'done'
   | 'help'
-  | '@work'
+  | '@computer'
+  | '@phone'
   | '@home'
-  | '@errands'
-  | '@calls'
-  | '@computer';
+  | '@outside';
 
 /**
  * Person data for agenda matching

@@ -10,7 +10,7 @@ export interface NotionTaskProperties {
   Task: string;
   Type: 'Action' | 'Project' | 'Waiting' | 'Someday' | 'Agenda';
   Status: 'To Do' | 'In Progress' | 'Done' | 'Discussed';
-  Context?: '@work' | '@home' | '@errands' | '@calls' | '@computer' | '@anywhere';
+  Context?: '@computer' | '@phone' | '@home' | '@outside';
   Person?: string; // Notion page ID
   Due?: string; // ISO date
   Priority?: '🔥 Today' | '⚡ This week' | '📋 Soon';
@@ -46,12 +46,10 @@ export const TASK_TYPE_TO_NOTION: Record<string, string> = {
  * Context mapping from internal to Notion
  */
 export const CONTEXT_TO_NOTION: Record<string, string> = {
-  work: '@work',
-  home: '@home',
-  errands: '@errands',
-  calls: '@calls',
   computer: '@computer',
-  anywhere: '@anywhere',
+  phone: '@phone',
+  home: '@home',
+  outside: '@outside',
 };
 
 /**
@@ -121,12 +119,10 @@ export const TASKS_DATABASE_PROPERTIES = {
   Context: {
     select: {
       options: [
-        { name: '@work', color: 'blue' },
-        { name: '@home', color: 'red' },
-        { name: '@errands', color: 'yellow' },
-        { name: '@calls', color: 'green' },
         { name: '@computer', color: 'purple' },
-        { name: '@anywhere', color: 'gray' },
+        { name: '@phone', color: 'pink' },
+        { name: '@home', color: 'green' },
+        { name: '@outside', color: 'orange' },
       ],
     },
   },

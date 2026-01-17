@@ -22,12 +22,10 @@ const TYPE_EMOJI: Record<TaskType, string> = {
  * Emoji mapping for contexts
  */
 const CONTEXT_DISPLAY: Record<TaskContext, string> = {
-  work: '📍 @work',
-  home: '📍 @home',
-  errands: '📍 @errands',
-  calls: '📍 @calls',
-  computer: '📍 @computer',
-  anywhere: '📍 @anywhere',
+  computer: '💻 @computer',
+  phone: '📱 @phone',
+  home: '🏠 @home',
+  outside: '🚗 @outside',
 };
 
 /**

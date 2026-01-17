@@ -107,7 +107,7 @@ Creates task in PostgreSQL → Syncs to Notion → Sends confirmation SMS back
 - title (text) -- Cleaned title
 - type (enum: 'action', 'project', 'waiting', 'someday', 'agenda')
 - status (enum: 'pending', 'synced', 'completed', 'failed')
-- context (enum: 'work', 'home', 'errands', 'calls', 'computer', 'anywhere')
+- context (enum: 'computer', 'phone', 'home', 'outside')
 - priority (enum: 'today', 'this_week', 'soon')
 - person_id (uuid, FK → people)
 - notion_page_id (text) -- After sync
@@ -208,7 +208,7 @@ The system auto-creates two databases during onboarding:
 | Task | title | Task name |
 | Type | select | Action, Project, Waiting, Someday, Agenda |
 | Status | select | To Do, Done, Discussed |
-| Context | select | @work, @home, @errands, @calls, @computer |
+| Context | select | @computer, @phone, @home, @outside |
 | Priority | select | 🔥 Today, 📅 This Week, 🔜 Soon |
 | Due | date | Due date |
 | Person | relation | → People database |

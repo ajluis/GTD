@@ -31,12 +31,10 @@ const TASKS_DATABASE_PROPERTIES = {
   Context: {
     select: {
       options: [
-        { name: '@work', color: 'blue' },
-        { name: '@home', color: 'green' },
-        { name: '@errands', color: 'orange' },
-        { name: '@calls', color: 'pink' },
         { name: '@computer', color: 'purple' },
-        { name: '@anywhere', color: 'gray' },
+        { name: '@phone', color: 'pink' },
+        { name: '@home', color: 'green' },
+        { name: '@outside', color: 'orange' },
       ],
     },
   },

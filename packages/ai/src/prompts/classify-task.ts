@@ -242,13 +242,10 @@ For intents, extract these entities when present:
   * For hours: Extract just the number (e.g., "2", "3")
     - "remind me 3 hours before" → "3"
 - context: Assign based on WHERE/HOW the task can be done:
-  * "calls" - Quick tasks doable from phone (slack, email, text, quick calls)
-    → Can be done while in car, waiting rooms, etc.
-  * "computer" - Dense work requiring full keyboard/screen (writing, coding, research, spreadsheets)
-  * "errands" - Physical tasks outside (shopping, pickup, dropoff, appointments)
-  * "home" - Tasks that can only be done at home (chores, home repairs)
-  * "work" - Tasks requiring being at work location (meetings, office equipment)
-  * "anywhere" - Truly location-independent tasks
+  * "computer" - Dense work requiring full keyboard/screen (writing, coding, research, spreadsheets, design)
+  * "phone" - Quick tasks doable from phone (slack, email, text, calls) - can be done in car, waiting rooms
+  * "home" - Tasks at home (chores, home repairs, personal admin)
+  * "outside" - Physical tasks outside the house (shopping, pickup, dropoff, appointments, errands)
 - priority: today, this_week, soon
 - dueDate: Parse to ISO format (YYYY-MM-DD)
 - taskType: action, project, waiting, someday, agenda
@@ -306,7 +303,7 @@ FOR TASK CAPTURE (complete info):
 {
   "type": "action" | "project" | "agenda" | "waiting" | "someday",
   "title": "cleaned task title",
-  "context": "work" | "home" | "errands" | "calls" | "computer" | "anywhere",
+  "context": "computer" | "phone" | "home" | "outside",
   "priority": "today" | "this_week" | "soon",
   "personMatch": {
     "personId": "uuid from People list",
@@ -320,12 +317,10 @@ FOR TASK CAPTURE (complete info):
 
 REQUIRED - Always set context and priority:
 - context: ALWAYS infer from task action:
-  * call/text/email/slack/message → "calls"
+  * call/text/email/slack/message → "phone"
   * write/code/research/spreadsheet/design → "computer"
-  * buy/shop/pickup/dropoff/appointment → "errands"
-  * chore/clean/fix at home → "home"
-  * meeting/office task → "work"
-  * if unclear → "anywhere"
+  * buy/shop/pickup/dropoff/appointment/errand → "outside"
+  * chore/clean/fix/laundry/cook → "home"
 - priority: ALWAYS set based on timeline:
   * "today", "asap", "urgent", "now" → "today"
   * "this week", "Tuesday", specific day → "this_week"

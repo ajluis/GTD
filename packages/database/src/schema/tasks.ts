@@ -37,12 +37,10 @@ export const taskPriorityEnum = pgEnum('task_priority', [
  * GTD Context enum
  */
 export const taskContextEnum = pgEnum('task_context', [
-  'work', // @work
-  'home', // @home
-  'errands', // @errands
-  'calls', // @calls
-  'computer', // @computer
-  'anywhere', // @anywhere
+  'computer', // Dense work requiring keyboard/screen
+  'phone', // Quick tasks from phone (calls, texts, emails)
+  'home', // Tasks at home
+  'outside', // Errands, appointments, physical tasks
 ]);
 
 /**

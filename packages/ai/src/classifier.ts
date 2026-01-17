@@ -350,7 +350,7 @@ const VALID_INTENTS: IntentType[] = [
 /**
  * Validation helpers
  */
-const VALID_CONTEXTS = ['work', 'home', 'errands', 'calls', 'computer', 'anywhere'] as const;
+const VALID_CONTEXTS = ['computer', 'phone', 'home', 'outside'] as const;
 const VALID_PRIORITIES = ['today', 'this_week', 'soon'] as const;
 const VALID_TASK_TYPES = ['action', 'project', 'waiting', 'someday', 'agenda'] as const;
 const VALID_DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const;
