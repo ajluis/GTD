@@ -306,8 +306,8 @@ FOR TASK CAPTURE (complete info):
 {
   "type": "action" | "project" | "agenda" | "waiting" | "someday",
   "title": "cleaned task title",
-  "context": "work" | "home" | "errands" | "calls" | "computer" | "anywhere" | null,
-  "priority": "today" | "this_week" | "soon" | null,
+  "context": "work" | "home" | "errands" | "calls" | "computer" | "anywhere",
+  "priority": "today" | "this_week" | "soon",
   "personMatch": {
     "personId": "uuid from People list",
     "name": "person name",
@@ -317,6 +317,19 @@ FOR TASK CAPTURE (complete info):
   "confidence": 0.0-1.0,
   "reasoning": "brief explanation"
 }
+
+REQUIRED - Always set context and priority:
+- context: ALWAYS infer from task action:
+  * call/text/email/slack/message → "calls"
+  * write/code/research/spreadsheet/design → "computer"
+  * buy/shop/pickup/dropoff/appointment → "errands"
+  * chore/clean/fix at home → "home"
+  * meeting/office task → "work"
+  * if unclear → "anywhere"
+- priority: ALWAYS set based on timeline:
+  * "today", "asap", "urgent", "now" → "today"
+  * "this week", "Tuesday", specific day → "this_week"
+  * no urgency mentioned → "soon"
 
 FOR TASKS THAT NEED MORE CONTEXT (be proactive!):
 Ask follow-up questions to make tasks more actionable. Even if a task COULD be saved,
