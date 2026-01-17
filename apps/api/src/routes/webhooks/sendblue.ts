@@ -78,6 +78,17 @@ export function createSendblueWebhook(config: SendblueWebhookConfig): FastifyPlu
         const payload = request.body;
         const rawBody = (request as any).rawBody as string;
 
+        // Log incoming message
+        fastify.log.info(
+          {
+            from: payload.from_number,
+            content: payload.content?.slice(0, 100),
+            isOutbound: payload.is_outbound,
+            messageHandle: payload.message_handle,
+          },
+          '📨 INBOUND WEBHOOK RECEIVED'
+        );
+
         // 1. Validate webhook signature (skip if SKIP_WEBHOOK_VALIDATION is set)
         const skipValidation = process.env['SKIP_WEBHOOK_VALIDATION'] === 'true';
 

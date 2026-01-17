@@ -24,7 +24,12 @@ export function createInboundProcessor(
   return async (job: Job<InboundMessageJobData>) => {
     const { fromNumber, content, messageHandle, receivedAt } = job.data;
 
-    console.log(`[Inbound] Processing message from ${fromNumber}: "${content.slice(0, 50)}..."`);
+    console.log('═'.repeat(60));
+    console.log(`📨 INBOUND MESSAGE RECEIVED`);
+    console.log(`   From: ${fromNumber}`);
+    console.log(`   Content: "${content}"`);
+    console.log(`   Handle: ${messageHandle}`);
+    console.log('═'.repeat(60));
 
     // 1. Find or create user
     let user = await db.query.users.findFirst({

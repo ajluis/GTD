@@ -19,7 +19,11 @@ export function createOutboundProcessor(db: DbClient, sendblue?: SendblueClient)
   return async (job: Job<OutboundMessageJobData>) => {
     const { userId, toNumber, content, inReplyTo } = job.data;
 
-    console.log(`[Outbound] Sending message to ${toNumber}: "${content.slice(0, 50)}..."`);
+    console.log('═'.repeat(60));
+    console.log(`📤 OUTBOUND MESSAGE SENDING`);
+    console.log(`   To: ${toNumber}`);
+    console.log(`   Content: "${content}"`);
+    console.log('═'.repeat(60));
 
     // Split long messages
     const parts = splitMessage(content);
