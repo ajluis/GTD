@@ -184,6 +184,13 @@ export function createClassifyProcessor(
     );
 
     console.log(`[Classify] Result: ${classification.type} (${classification.confidence})`);
+    console.log(`[Classify] Fields:`, {
+      title: classification.title,
+      context: classification.context,
+      priority: classification.priority,
+      dueDate: classification.dueDate,
+      personMatch: classification.personMatch,
+    });
 
     // 6. Update message with classification
     await db
