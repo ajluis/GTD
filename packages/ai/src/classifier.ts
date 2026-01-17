@@ -9,6 +9,7 @@ import { GeminiClient, createGeminiClient } from './gemini-client.js';
 import {
   buildClassificationPrompt,
   CLASSIFIER_SYSTEM_PROMPT,
+  type ConversationMessage,
 } from './prompts/classify-task.js';
 
 /**
@@ -31,14 +32,16 @@ export class GTDClassifier {
    * @param message - Raw SMS message text
    * @param people - User's configured people for agenda matching
    * @param currentTime - Current time for date parsing (optional)
+   * @param conversationHistory - Recent conversation messages for context (optional)
    * @returns Classification result with type, intent, or task details
    */
   async classify(
     message: string,
     people: PersonForMatching[] = [],
-    currentTime: Date = new Date()
+    currentTime: Date = new Date(),
+    conversationHistory: ConversationMessage[] = []
   ): Promise<ClassificationResult> {
-    const prompt = buildClassificationPrompt(message, people, currentTime);
+    const prompt = buildClassificationPrompt(message, people, currentTime, conversationHistory);
 
     try {
       const result = await this.gemini.generateJSON<RawClassificationResult>(
