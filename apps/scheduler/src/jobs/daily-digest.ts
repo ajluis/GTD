@@ -137,7 +137,7 @@ async function getDigestData(user: {
   return {
     todayCount: todayTasks.length,
     actionCount: allActions.length,
-    topTasks: todayTasks.slice(0, 3).map((t) => extractTaskTitle(t)),
+    topTasks: todayTasks.slice(0, 3).map((t: unknown) => extractTaskTitle(t)),
   };
 }
 

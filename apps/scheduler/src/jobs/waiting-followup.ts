@@ -48,7 +48,7 @@ export async function runWaitingFollowups(
       const waitingTasks = await queryWaitingTasks(notion, user.notionTasksDatabaseId);
 
       // Filter to overdue items
-      const overdueItems = waitingTasks.filter((task) => {
+      const overdueItems = waitingTasks.filter((task: unknown) => {
         const dueDate = extractTaskDueDate(task);
         return dueDate && dueDate < today;
       });
@@ -76,7 +76,7 @@ export async function runWaitingFollowups(
 /**
  * Format waiting reminder message
  */
-function formatWaitingReminder(overdueItems: any[]): string {
+function formatWaitingReminder(overdueItems: unknown[]): string {
   const count = overdueItems.length;
 
   const lines: string[] = [

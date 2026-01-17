@@ -94,6 +94,9 @@ importers:
         specifier: ^3.0.3
         version: 3.0.3
     devDependencies:
+      '@types/node':
+        specifier: ^20.10.0
+        version: 20.19.30
       '@types/node-cron':
         specifier: ^3.0.11
         version: 3.0.11

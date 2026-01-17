@@ -152,7 +152,7 @@ function getHourInTimezone(date: Date, timezone: string): number {
 /**
  * Format meeting reminder message
  */
-function formatMeetingReminder(personName: string, agendaItems: any[]): string {
+function formatMeetingReminder(personName: string, agendaItems: unknown[]): string {
   const itemCount = agendaItems.length;
 
   if (itemCount === 0) {
