@@ -26,6 +26,7 @@ COPY packages/gtd/package.json ./packages/gtd/
 COPY packages/todoist/package.json ./packages/todoist/
 COPY apps/api/package.json ./apps/api/
 COPY apps/worker/package.json ./apps/worker/
+COPY apps/scheduler/package.json ./apps/scheduler/
 
 # Install all dependencies
 RUN pnpm install --frozen-lockfile
@@ -80,6 +81,24 @@ COPY --from=builder /app/package.json ./
 USER node
 
 CMD ["node", "apps/worker/dist/index.js"]
+
+# ============================================
+# Scheduler production image
+# ============================================
+FROM base AS scheduler
+
+ENV NODE_ENV=production
+
+# Copy built packages and node_modules
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/packages ./packages
+COPY --from=builder /app/apps/scheduler ./apps/scheduler
+COPY --from=builder /app/package.json ./
+
+# Run as non-root user
+USER node
+
+CMD ["node", "apps/scheduler/dist/index.js"]
 
 # ============================================
 # Default: API
