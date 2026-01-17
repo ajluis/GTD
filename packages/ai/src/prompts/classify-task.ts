@@ -193,8 +193,20 @@ If NOT an intent, classify as a task to capture:
    - These are communication tasks YOU perform → classify as ACTION
 
 2. WAITING - Delegated or expecting from someone
-   Signals: "waiting on", "waiting for", "asked [person] to", "[person] owes me"
+   Signals: "waiting on", "waiting for", "asked [person] to", "[person] owes me", "[person] needs to"
    → type: "waiting", include person if mentioned
+
+   TITLE FORMAT: Professional deliverable style
+   "[Person] to [action verb] [deliverable]"
+
+   Examples of title cleanup:
+   - "Lily owes me new funnel" → "Lily to deliver new funnel for collecting reviews"
+   - "waiting on John for report" → "John to deliver Q4 report"
+   - "asked Sarah to review doc" → "Sarah to review and approve document"
+   - "Mike needs to get me specs" → "Mike to provide technical specifications"
+
+   Remove: "owes me", "needs to get me", "waiting on", "waiting for"
+   Use verbs: deliver, provide, complete, review, send, prepare, finalize
 
 3. PROJECT - Multi-step outcome
    Signals: "plan", "organize", "launch", "complete" + complex goal
