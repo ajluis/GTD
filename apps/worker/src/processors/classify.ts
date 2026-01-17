@@ -889,6 +889,15 @@ async function handleClarificationResponse(
     []
   );
 
+  console.log(`[Clarification] Re-classification result:`, {
+    type: classification.type,
+    title: classification.title,
+    context: classification.context,
+    priority: classification.priority,
+    dueDate: classification.dueDate,
+    personMatch: classification.personMatch,
+  });
+
   // Use the classification result, falling back to partial task type
   const taskType = (classification.type !== 'unknown' && classification.type !== 'needs_clarification' && classification.type !== 'intent' && classification.type !== 'command')
     ? classification.type
@@ -902,6 +911,8 @@ async function handleClarificationResponse(
 
   // Find matched person if applicable
   let matchedPerson: PersonForMatching | undefined;
+  let newlyCreatedPersonId: string | null = null;
+
   if (classification.personMatch && classification.personMatch.confidence > 0.5) {
     matchedPerson = peopleForMatching.find(
       (p) => p.id === classification.personMatch!.personId
@@ -912,6 +923,57 @@ async function handleClarificationResponse(
   const missingInfo = data.missingInfo || [];
   const isPersonInfo = missingInfo.includes('person') || clarificationText.toLowerCase().includes("he's") || clarificationText.toLowerCase().includes("she's");
   const notes = isPersonInfo ? null : clarificationText; // Only add as notes if it's task-relevant detail
+
+  // AUTO-CREATE PERSON: If clarification was about a person and we don't have a match,
+  // extract the person name and create them
+  if (isPersonInfo && !matchedPerson) {
+    // Try to extract person name from the original message (look for capitalized names)
+    const nameMatch = originalMessage.match(/(?:ask|tell|with|for|from|to|@)\s+([A-Z][a-z]+)/i);
+    const extractedName = nameMatch ? nameMatch[1] : null;
+
+    if (extractedName) {
+      // Check if person already exists
+      const existingPerson = userPeople.find(
+        (p) => p.name.toLowerCase() === extractedName.toLowerCase()
+      );
+
+      if (!existingPerson) {
+        // Create in Notion if configured
+        let notionPageId: string | null = null;
+        if (user.notionAccessToken && user.notionPeopleDatabaseId) {
+          try {
+            console.log(`[Clarification] Auto-creating ${extractedName} in Notion...`);
+            const notion = createNotionClient(user.notionAccessToken);
+            notionPageId = await createNotionPerson(notion, user.notionPeopleDatabaseId, {
+              name: extractedName,
+            });
+            console.log(`[Clarification] Created Notion page: ${notionPageId}`);
+          } catch (error) {
+            console.error(`[Clarification] Failed to create in Notion:`, error);
+          }
+        }
+
+        // Save to local database
+        const [newPerson] = await db.insert(people).values({
+          userId: user.id,
+          name: extractedName,
+          notionPageId,
+          active: true,
+        }).returning();
+
+        if (newPerson) {
+          newlyCreatedPersonId = newPerson.id;
+          console.log(`[Clarification] Auto-created person: ${extractedName} (${newPerson.id})`);
+        }
+      } else {
+        // Person already exists, use them
+        newlyCreatedPersonId = existingPerson.id;
+      }
+    }
+  }
+
+  // Determine the person ID to use (matched person, newly created, or null)
+  const finalPersonId = matchedPerson?.id ?? newlyCreatedPersonId ?? null;
 
   // Create the task with all extracted fields
   const [task] = await db
@@ -924,7 +986,7 @@ async function handleClarificationResponse(
       status: 'pending',
       context: classification.context ?? null,
       priority: classification.priority ?? null,
-      personId: matchedPerson?.id ?? null,
+      personId: finalPersonId,
       dueDate: classification.dueDate ?? null,
       notes: notes ?? null,
     })
@@ -955,12 +1017,16 @@ async function handleClarificationResponse(
     },
   });
 
+  // Get the person name for display (from match or newly created)
+  const displayPersonName = matchedPerson?.name ??
+    (newlyCreatedPersonId ? originalMessage.match(/(?:ask|tell|with|for|from|to|@)\s+([A-Z][a-z]+)/i)?.[1] : undefined);
+
   return formatTaskCapture(
     title,
     taskType as any,
     classification.context,
     classification.priority,
     classification.dueDate,
-    matchedPerson?.name
+    displayPersonName
   );
 }

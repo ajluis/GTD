@@ -260,7 +260,13 @@ IMPORTANT: Be LENIENT with person names:
 - Don't flag messages as unclear just because a name looks unusual
 
 For TASK CAPTURE, extract:
-- title: Clean task title
+- title: Clean task title - REMOVE casual prefixes:
+  * Remove: "Let's", "I need to", "I should", "Can you", "Can you add", "Could you"
+  * Remove: "We should", "We need to", "You should", "Don't forget to", "Remember to"
+  * Remove: "Please", "Just", "Gotta", "Need to", "Want to", "I want to"
+  * Example: "Let's ask Sam on Tuesday" → "Ask Sam on Tuesday"
+  * Example: "Can you add call dentist" → "Call dentist"
+  * Keep the core ACTION starting with a verb
 - context, priority, dueDate, personMatch (with personId from People list)
 
 ═══════════════════════════════════════════════════════════════
