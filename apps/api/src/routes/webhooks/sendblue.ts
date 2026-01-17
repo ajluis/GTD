@@ -78,27 +78,33 @@ export function createSendblueWebhook(config: SendblueWebhookConfig): FastifyPlu
         const payload = request.body;
         const rawBody = (request as any).rawBody as string;
 
-        // 1. Validate webhook signature
-        try {
-          const { signature, timestamp } = extractValidationHeaders(
-            request.headers as Record<string, string | string[] | undefined>
-          );
+        // 1. Validate webhook signature (skip if SKIP_WEBHOOK_VALIDATION is set)
+        const skipValidation = process.env['SKIP_WEBHOOK_VALIDATION'] === 'true';
 
-          validateWebhookSignature(
-            rawBody,
-            signature,
-            timestamp,
-            config.webhookSecret
-          );
-        } catch (error) {
-          if (error instanceof WebhookValidationError) {
-            fastify.log.warn({ error: error.message }, 'Webhook validation failed');
-            return reply.status(401).send({
-              error: 'Unauthorized',
-              message: error.message,
-            });
+        if (!skipValidation) {
+          try {
+            const { signature, timestamp } = extractValidationHeaders(
+              request.headers as Record<string, string | string[] | undefined>
+            );
+
+            validateWebhookSignature(
+              rawBody,
+              signature,
+              timestamp,
+              config.webhookSecret
+            );
+          } catch (error) {
+            if (error instanceof WebhookValidationError) {
+              fastify.log.warn({ error: error.message }, 'Webhook validation failed');
+              return reply.status(401).send({
+                error: 'Unauthorized',
+                message: error.message,
+              });
+            }
+            throw error;
           }
-          throw error;
+        } else {
+          fastify.log.debug('Webhook signature validation skipped');
         }
 
         // 2. Skip outbound messages (our own replies)
