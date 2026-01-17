@@ -1,6 +1,6 @@
 import { pgTable, uuid, text, timestamp, date, pgEnum, index } from 'drizzle-orm/pg-core';
-import { users } from './users.js';
-import { people } from './people.js';
+import { users } from './users';
+import { people } from './people';
 
 /**
  * GTD Task type enum

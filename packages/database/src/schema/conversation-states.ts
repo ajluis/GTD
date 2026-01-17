@@ -1,5 +1,5 @@
 import { pgTable, uuid, text, timestamp, jsonb, index } from 'drizzle-orm/pg-core';
-import { users } from './users.js';
+import { users } from './users';
 
 /**
  * Conversation States table

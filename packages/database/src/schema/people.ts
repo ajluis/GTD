@@ -1,5 +1,5 @@
 import { pgTable, uuid, text, timestamp, boolean, pgEnum, index } from 'drizzle-orm/pg-core';
-import { users } from './users.js';
+import { users } from './users';
 
 /**
  * Meeting frequency enum

@@ -1,2 +1,2 @@
-export { createDbClient, type DbClient } from './client.js';
-export * from './schema/index.js';
+export { createDbClient, type DbClient } from './client';
+export * from './schema/index';
