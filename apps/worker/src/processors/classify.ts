@@ -845,7 +845,7 @@ async function createTaskFromClassification(
 
 /**
  * Handle clarification response from user
- * Merges the new info with the partial task and creates the complete task
+ * Re-classifies the combined message to extract priority, context, dueDate, etc.
  */
 async function handleClarificationResponse(
   db: DbClient,
@@ -854,28 +854,67 @@ async function handleClarificationResponse(
   state: any,
   clarificationText: string
 ): Promise<string> {
+  const classifier = createClassifier();
+
   const data = state.data as {
     partialTask?: { type: string; title: string };
     missingInfo?: string[];
     originalMessage?: string;
   };
 
-  // Merge the original task with clarification
-  const originalTitle = data.partialTask?.title || data.originalMessage || '';
-  const taskType = data.partialTask?.type || 'action';
+  // Combine original message with clarification for re-classification
+  const originalMessage = data.originalMessage || data.partialTask?.title || '';
+  const combinedMessage = `${originalMessage} - ${clarificationText}`;
 
-  // Create enhanced task title combining original + clarification
-  const enhancedTitle = `${originalTitle} - ${clarificationText}`;
+  // Get user's people for matching
+  const userPeople = await db.query.people.findMany({
+    where: eq(people.userId, user.id),
+  });
 
-  // Create the task
+  const peopleForMatching: PersonForMatching[] = userPeople.map((p) => ({
+    id: p.id,
+    name: p.name,
+    aliases: p.aliases ?? [],
+    frequency: p.frequency,
+    dayOfWeek: p.dayOfWeek,
+  }));
+
+  // Re-classify the combined message to extract all fields
+  const classification = await classifier.classify(
+    combinedMessage,
+    peopleForMatching,
+    new Date(),
+    [] // No conversation history needed for clarification
+  );
+
+  // Use the classification result, falling back to partial task type
+  const taskType = (classification.type !== 'unknown' && classification.type !== 'needs_clarification' && classification.type !== 'intent' && classification.type !== 'command')
+    ? classification.type
+    : (data.partialTask?.type || 'action');
+
+  const title = classification.title || combinedMessage;
+
+  // Find matched person if applicable
+  let matchedPerson: PersonForMatching | undefined;
+  if (classification.personMatch && classification.personMatch.confidence > 0.5) {
+    matchedPerson = peopleForMatching.find(
+      (p) => p.id === classification.personMatch!.personId
+    );
+  }
+
+  // Create the task with all extracted fields
   const [task] = await db
     .insert(tasks)
     .values({
       userId: user.id,
-      rawText: `${data.originalMessage} (clarified: ${clarificationText})`,
-      title: enhancedTitle,
+      rawText: combinedMessage,
+      title,
       type: taskType as any,
       status: 'pending',
+      context: classification.context ?? null,
+      priority: classification.priority ?? null,
+      personId: matchedPerson?.id ?? null,
+      dueDate: classification.dueDate ?? null,
     })
     .returning();
 
@@ -888,16 +927,27 @@ async function handleClarificationResponse(
     })
     .where(eq(users.id, user.id));
 
-  // Queue for Notion sync
+  // Queue for Notion sync with full classification
   await enqueueNotionSync(messageQueue, {
     userId: user.id,
     taskId: task!.id,
     classification: {
       type: taskType as any,
-      title: enhancedTitle,
-      confidence: 1.0,
+      title,
+      confidence: classification.confidence,
+      context: classification.context,
+      priority: classification.priority,
+      personMatch: classification.personMatch,
+      dueDate: classification.dueDate,
     },
   });
 
-  return formatTaskCapture(enhancedTitle, taskType as any);
+  return formatTaskCapture(
+    title,
+    taskType as any,
+    classification.context,
+    classification.priority,
+    classification.dueDate,
+    matchedPerson?.name
+  );
 }
