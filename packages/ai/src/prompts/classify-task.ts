@@ -150,10 +150,20 @@ INTENT DETECTION (check FIRST)
 
 6. CORRECTION INTENTS - User wants to FIX a recent action
    ┌─────────────────────────────────────────────────────────────
-   │ "undo", "undo that", "take that back", "never mind" → undo_last
-   │ "that's wrong", "that wasn't right" → undo_last
    │ "that should be a [type]", "make it a project" → change_task_type
    │ "I meant [person]", "wrong person, it's [person]" → correct_person
+   │
+   │ IMPORTANT - "undo", "remove that", "take that back", "never mind":
+   │ Use RECENT CONVERSATION to determine the right action:
+   │
+   │ • If CLARITY just confirmed a NEW TASK → use delete_task
+   │   Example: CLARITY showed "✅ Action: 'Call dentist'" then USER says "undo"
+   │   → delete_task with taskText: "Call dentist"
+   │
+   │ • If CLARITY just confirmed TASK COMPLETED → use uncomplete_task (not implemented yet)
+   │   For now, tell user: "To restore a completed task, find it in Notion"
+   │
+   │ • If no clear recent action → show_help
    └─────────────────────────────────────────────────────────────
 
 7. BULK OPERATION INTENTS
