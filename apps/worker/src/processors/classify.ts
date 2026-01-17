@@ -845,7 +845,7 @@ async function createTaskFromClassification(
 
 /**
  * Handle clarification response from user
- * Re-classifies the combined message to extract priority, context, dueDate, etc.
+ * Re-classifies to extract fields, keeps original title clean, puts extra info in notes
  */
 async function handleClarificationResponse(
   db: DbClient,
@@ -862,9 +862,11 @@ async function handleClarificationResponse(
     originalMessage?: string;
   };
 
-  // Combine original message with clarification for re-classification
   const originalMessage = data.originalMessage || data.partialTask?.title || '';
-  const combinedMessage = `${originalMessage} - ${clarificationText}`;
+
+  // Classify the combined context to extract fields (date, priority, person, etc.)
+  // but we'll use the ORIGINAL message as the clean title
+  const combinedForClassification = `${originalMessage}. Additional context: ${clarificationText}`;
 
   // Get user's people for matching
   const userPeople = await db.query.people.findMany({
@@ -879,12 +881,12 @@ async function handleClarificationResponse(
     dayOfWeek: p.dayOfWeek,
   }));
 
-  // Re-classify the combined message to extract all fields
+  // Re-classify to extract all fields
   const classification = await classifier.classify(
-    combinedMessage,
+    combinedForClassification,
     peopleForMatching,
     new Date(),
-    [] // No conversation history needed for clarification
+    []
   );
 
   // Use the classification result, falling back to partial task type
@@ -892,7 +894,11 @@ async function handleClarificationResponse(
     ? classification.type
     : (data.partialTask?.type || 'action');
 
-  const title = classification.title || combinedMessage;
+  // Keep the ORIGINAL title clean - don't append clarification to it
+  // Use classification.title if it's cleaner, otherwise use original
+  const title = classification.title && !classification.title.includes('Additional context')
+    ? classification.title
+    : originalMessage;
 
   // Find matched person if applicable
   let matchedPerson: PersonForMatching | undefined;
@@ -902,12 +908,17 @@ async function handleClarificationResponse(
     );
   }
 
+  // Determine if clarification adds meaningful notes (not just person info or dates)
+  const missingInfo = data.missingInfo || [];
+  const isPersonInfo = missingInfo.includes('person') || clarificationText.toLowerCase().includes("he's") || clarificationText.toLowerCase().includes("she's");
+  const notes = isPersonInfo ? null : clarificationText; // Only add as notes if it's task-relevant detail
+
   // Create the task with all extracted fields
   const [task] = await db
     .insert(tasks)
     .values({
       userId: user.id,
-      rawText: combinedMessage,
+      rawText: originalMessage,
       title,
       type: taskType as any,
       status: 'pending',
@@ -915,6 +926,7 @@ async function handleClarificationResponse(
       priority: classification.priority ?? null,
       personId: matchedPerson?.id ?? null,
       dueDate: classification.dueDate ?? null,
+      notes: notes ?? null,
     })
     .returning();
 
@@ -928,6 +940,7 @@ async function handleClarificationResponse(
     .where(eq(users.id, user.id));
 
   // Queue for Notion sync with full classification
+  // Notes are already saved to task record and will be synced from there
   await enqueueNotionSync(messageQueue, {
     userId: user.id,
     taskId: task!.id,
