@@ -187,6 +187,8 @@ INTENT DETECTION (check FIRST)
    │ "when do I get my weekly review" → show_settings
    │ "review on sunday", "change review day to saturday" → set_review_day
    │ "move review to friday", "weekly review on monday" → set_review_day
+   │ "change weekly review to monday at 10am" → set_review_day (with newValue: "monday at 10am")
+   │ "review on saturday at 5pm" → set_review_day (with newValue: "saturday at 5pm")
    │ "review at 6pm", "weekly review at 5:30pm" → set_review_time
    │ "change review time to 7pm", "send review at 8am" → set_review_time
    └─────────────────────────────────────────────────────────────

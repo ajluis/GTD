@@ -290,7 +290,7 @@ export async function handleShowSettings(ctx: HandlerContext): Promise<string> {
 
 /**
  * Handle set_review_day intent
- * "review on sundays", "weekly review on saturday"
+ * "review on sundays", "weekly review on saturday", "review monday at 10am"
  */
 export async function handleSetReviewDay(
   entities: IntentEntities,
@@ -300,19 +300,42 @@ export async function handleSetReviewDay(
 
   const validDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 
-  if (!dayValue || !validDays.includes(dayValue)) {
+  // Try to extract day from newValue if dayOfWeek not set
+  let day = dayValue;
+  if (!day || !validDays.includes(day)) {
+    // Check if newValue contains a day name
+    const newValueLower = entities.newValue?.toLowerCase() ?? '';
+    day = validDays.find(d => newValueLower.includes(d));
+  }
+
+  if (!day) {
     return "Which day? Try 'review on Sunday' or 'weekly review on Saturday'.";
+  }
+
+  // Check if time is also included (e.g., "monday at 10am")
+  const timeMatch = entities.newValue?.match(/(\d{1,2}(?::\d{2})?\s*(?:am|pm))/i);
+  const parsedTime = timeMatch ? parseTimeString(timeMatch[1]) : null;
+
+  // Build update object
+  const updates: { weeklyReviewDay: string; weeklyReviewTime?: string; updatedAt: Date } = {
+    weeklyReviewDay: day,
+    updatedAt: new Date(),
+  };
+
+  let reviewTime = ctx.user.weeklyReviewTime;
+  if (parsedTime) {
+    updates.weeklyReviewTime = parsedTime;
+    reviewTime = parsedTime;
   }
 
   await ctx.db
     .update(users)
-    .set({ weeklyReviewDay: dayValue, updatedAt: new Date() })
+    .set(updates)
     .where(eq(users.id, ctx.user.id));
 
-  const displayDay = dayValue.charAt(0).toUpperCase() + dayValue.slice(1);
-  const reviewTime = formatTime(ctx.user.weeklyReviewTime);
+  const displayDay = day.charAt(0).toUpperCase() + day.slice(1);
 
-  return `✅ Weekly review moved to ${displayDay} at ${reviewTime}.`;
+  return `✅ Weekly review moved to ${displayDay} at ${formatTime(reviewTime)}.`;
 }
 
 /**
