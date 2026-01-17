@@ -6,6 +6,7 @@ import type { DbClient } from '@clarity/database';
 import { users, messages, tasks, people } from '@clarity/database';
 import { eq } from 'drizzle-orm';
 import { createClassifier } from '@clarity/ai';
+import { createNotionClient, createPerson as createNotionPerson } from '@clarity/notion';
 import {
   isCommand,
   parseCommand,
@@ -194,10 +195,6 @@ async function handleCommand(
       }
 
       // Check if person already exists
-      const existing = await db.query.people.findFirst({
-        where: eq(people.userId, user.id),
-      });
-
       const allPeople = await db.query.people.findMany({
         where: eq(people.userId, user.id),
       });
@@ -210,17 +207,31 @@ async function handleCommand(
         return `👤 ${name} already exists in your people list.`;
       }
 
-      // Create label name from person name (lowercase, underscores)
-      const labelName = name.toLowerCase().replace(/\s+/g, '_');
+      // Create in Notion if user has People database configured
+      let notionPageId: string | null = null;
+      if (user.notionAccessToken && user.notionPeopleDatabaseId) {
+        try {
+          console.log(`[AddPerson] Creating ${name} in Notion People database...`);
+          const notion = createNotionClient(user.notionAccessToken);
+          notionPageId = await createNotionPerson(notion, user.notionPeopleDatabaseId, {
+            name,
+          });
+          console.log(`[AddPerson] Created Notion page: ${notionPageId}`);
+        } catch (error) {
+          console.error(`[AddPerson] Failed to create in Notion:`, error);
+          // Continue anyway - save locally
+        }
+      }
 
+      // Save to local database
       await db.insert(people).values({
         userId: user.id,
         name,
-        todoistLabel: labelName,
+        notionPageId,
         active: true,
       });
 
-      return `✅ Added ${name} to your people.\n📍 Agenda items will use label: ${labelName}\n\nOptional:\n• 'alias ${name} = nickname1, nickname2'\n• '${name} meets weekly on Tuesday'`;
+      return `✅ Added ${name} to your people.${notionPageId ? ' (synced to Notion)' : ''}\n\nOptional:\n• 'alias ${name} = nickname1, nickname2'\n• '${name} meets weekly on Tuesday'`;
     }
 
     case 'remove_person': {
