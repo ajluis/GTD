@@ -173,9 +173,14 @@ TASK CAPTURE (if not an intent)
 
 If NOT an intent, classify as a task to capture:
 
-1. AGENDA - Discussion topic for a person
-   Signals: "ask [person]", "tell [person]", "discuss with", "bring up with"
+1. AGENDA - Discussion topic for an IN-PERSON meeting
+   Signals: "discuss with", "bring up with", "talk to [person] about", "mention to"
+   → Only for face-to-face or scheduled meeting topics
    → Match person against People list, extract topic
+
+   NOT AGENDA (these are ACTIONS):
+   - "slack [person]", "email [person]", "text [person]", "call [person]", "message [person]"
+   - These are communication tasks YOU perform → classify as ACTION
 
 2. WAITING - Delegated or expecting from someone
    Signals: "waiting on", "waiting for", "asked [person] to", "[person] owes me"
@@ -192,6 +197,8 @@ If NOT an intent, classify as a task to capture:
 5. ACTION (default) - Single next step
    Clear actionable item with a verb
    → type: "action"
+
+   Common action verbs: call, email, text, slack, message, send, buy, fix, schedule, book, review
 
 ═══════════════════════════════════════════════════════════════
 ENTITY EXTRACTION (IMPORTANT)
