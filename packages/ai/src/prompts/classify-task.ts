@@ -136,6 +136,14 @@ INTENT DETECTION (check FIRST)
    │ "pause notifications", "going on vacation" → pause_account
    │ "I'm back", "resume notifications", "unpause" → resume_account
    │ "what are my settings", "show my preferences" → show_settings
+   │
+   │ WEEKLY REVIEW SCHEDULE CHANGES (route to set_review_day):
+   │ "change weekly review to [day]" → set_review_day
+   │ "change weekly review to [day] at [time]" → set_review_day
+   │ "Change weekly review to Monday at 10am" → set_review_day
+   │ "move weekly review to saturday at 5pm" → set_review_day
+   │ "set review to sunday at 6pm" → set_review_day
+   │ For these, extract the FULL text after "to" as newValue (e.g., "Monday at 10am")
    └─────────────────────────────────────────────────────────────
 
 5. TASK EDITING INTENTS - User wants to MODIFY an existing task
@@ -181,16 +189,8 @@ INTENT DETECTION (check FIRST)
    ┌─────────────────────────────────────────────────────────────
    │ "how am I doing", "my stats", "show statistics" → show_stats
    │ "weekly review", "review", "show my review" → show_weekly_review
-   │
-   │ WEEKLY REVIEW SETTINGS - These are about WHEN the review SMS arrives:
    │ "what time is weekly review", "when is my review" → show_settings
-   │ "when do I get my weekly review" → show_settings
-   │ "review on sunday", "change review day to saturday" → set_review_day
-   │ "move review to friday", "weekly review on monday" → set_review_day
-   │ "change weekly review to monday at 10am" → set_review_day (with newValue: "monday at 10am")
-   │ "review on saturday at 5pm" → set_review_day (with newValue: "saturday at 5pm")
-   │ "review at 6pm", "weekly review at 5:30pm" → set_review_time
-   │ "change review time to 7pm", "send review at 8am" → set_review_time
+   │ "review at 6pm" (time only, no day) → set_review_time
    └─────────────────────────────────────────────────────────────
 
 ═══════════════════════════════════════════════════════════════
