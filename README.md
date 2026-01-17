@@ -1,6 +1,6 @@
-# Clarity - SMS-Based GTD Task Management
+# GTD - SMS-Based GTD Task Management
 
-Clarity is an SMS-based GTD (Getting Things Done) assistant that syncs with Notion. Text your tasks, thoughts, and discussion topics — Clarity uses AI to classify them and organizes everything in Notion automatically.
+GTD is an SMS-based GTD (Getting Things Done) assistant that syncs with Notion. Text your tasks, thoughts, and discussion topics — GTD uses AI to classify them and organizes everything in Notion automatically.
 
 ## Features
 
@@ -25,7 +25,7 @@ Clarity is an SMS-based GTD (Getting Things Done) assistant that syncs with Noti
 ## Project Structure
 
 ```
-clarity/
+gtd/
 ├── apps/
 │   ├── api/          # Fastify webhook server
 │   └── worker/       # BullMQ message processor
@@ -53,7 +53,7 @@ clarity/
 1. **Clone the repository**
    ```bash
    git clone https://github.com/ajluis/GTD.git clarity
-   cd clarity
+   cd gtd
    ```
 
 2. **Install dependencies**
@@ -80,15 +80,15 @@ clarity/
 6. **Start development servers**
    ```bash
    # In separate terminals:
-   pnpm --filter @clarity/api dev
-   pnpm --filter @clarity/worker dev
+   pnpm --filter @gtd/api dev
+   pnpm --filter @gtd/worker dev
    ```
 
 ### Environment Variables
 
 ```bash
 # Database
-DATABASE_URL=postgres://clarity:clarity@localhost:5432/clarity
+DATABASE_URL=postgres://gtd:gtd@localhost:5432/gtd
 
 # Redis
 REDIS_URL=redis://localhost:6379

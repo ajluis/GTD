@@ -1,15 +1,15 @@
 import type { Queue } from 'bullmq';
-import type { DbClient } from '@clarity/database';
-import { users, people } from '@clarity/database';
+import type { DbClient } from '@gtd/database';
+import { users, people } from '@gtd/database';
 import { eq, and, isNotNull } from 'drizzle-orm';
-import { enqueueOutboundMessage } from '@clarity/queue';
-import type { MessageJobData } from '@clarity/queue';
+import { enqueueOutboundMessage } from '@gtd/queue';
+import type { MessageJobData } from '@gtd/queue';
 import {
   createNotionClient,
   queryAgendaForPerson,
   extractTaskTitle,
-} from '@clarity/notion';
-import type { DayOfWeek } from '@clarity/shared-types';
+} from '@gtd/notion';
+import type { DayOfWeek } from '@gtd/shared-types';
 
 /**
  * Meeting Reminder Job

@@ -98,14 +98,69 @@ async function main() {
     CREATE TABLE IF NOT EXISTS conversation_states (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      state VARCHAR(50) NOT NULL,
-      context JSONB,
-      expires_at TIMESTAMPTZ,
-      created_at TIMESTAMPTZ DEFAULT NOW(),
-      updated_at TIMESTAMPTZ DEFAULT NOW()
+      state_type TEXT NOT NULL,
+      step TEXT,
+      data JSONB DEFAULT '{}'::jsonb,
+      expires_at TIMESTAMPTZ NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+      updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
     )
   `;
   console.log('✅ conversation_states table created');
+
+  // Migrate existing conversation_states schema (if table already exists with old schema)
+  console.log('🔄 Checking for schema migrations...');
+  
+  // Check if old 'state' column exists and migrate
+  const stateColumnCheck = await sql`
+    SELECT column_name 
+    FROM information_schema.columns 
+    WHERE table_name = 'conversation_states' AND column_name = 'state'
+  `;
+  
+  if (stateColumnCheck.length > 0) {
+    console.log('  Migrating: state -> state_type');
+    await sql`ALTER TABLE conversation_states RENAME COLUMN state TO state_type`;
+  }
+
+  // Check if old 'context' column exists and migrate
+  const contextColumnCheck = await sql`
+    SELECT column_name 
+    FROM information_schema.columns 
+    WHERE table_name = 'conversation_states' AND column_name = 'context'
+  `;
+  
+  if (contextColumnCheck.length > 0) {
+    console.log('  Migrating: context -> data');
+    await sql`ALTER TABLE conversation_states RENAME COLUMN context TO data`;
+  }
+
+  // Add step column if it doesn't exist
+  const stepColumnCheck = await sql`
+    SELECT column_name 
+    FROM information_schema.columns 
+    WHERE table_name = 'conversation_states' AND column_name = 'step'
+  `;
+  
+  if (stepColumnCheck.length === 0) {
+    console.log('  Adding: step column');
+    await sql`ALTER TABLE conversation_states ADD COLUMN step TEXT`;
+  }
+
+  // Create indexes if they don't exist
+  await sql`
+    CREATE INDEX IF NOT EXISTS idx_conversation_states_user 
+    ON conversation_states(user_id)
+  `;
+  await sql`
+    CREATE INDEX IF NOT EXISTS idx_conversation_states_expires 
+    ON conversation_states(expires_at)
+  `;
+  await sql`
+    CREATE INDEX IF NOT EXISTS idx_conversation_states_type 
+    ON conversation_states(user_id, state_type)
+  `;
+  console.log('✅ conversation_states indexes created');
 
   console.log('\\n🎉 All tables created successfully!');
   await sql.end();

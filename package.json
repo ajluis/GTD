@@ -1,5 +1,5 @@
 {
-  "name": "clarity",
+  "name": "gtd",
   "version": "0.1.0",
   "private": true,
   "description": "SMS-based GTD assistant that syncs with Notion",
@@ -16,10 +16,10 @@
     "lint": "turbo lint",
     "test": "turbo test",
     "typecheck": "turbo typecheck",
-    "db:generate": "pnpm --filter @clarity/database generate",
-    "db:migrate": "pnpm --filter @clarity/database migrate",
-    "db:push": "pnpm --filter @clarity/database push",
-    "db:studio": "pnpm --filter @clarity/database studio",
+    "db:generate": "pnpm --filter @gtd/database generate",
+    "db:migrate": "pnpm --filter @gtd/database migrate",
+    "db:push": "pnpm --filter @gtd/database push",
+    "db:studio": "pnpm --filter @gtd/database studio",
     "clean": "turbo clean && rm -rf node_modules"
   },
   "devDependencies": {

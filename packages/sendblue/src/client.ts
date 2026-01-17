@@ -1,4 +1,4 @@
-import type { SendblueSendRequest, SendblueSendResponse } from '@clarity/shared-types';
+import type { SendblueSendRequest, SendblueSendResponse } from '@gtd/shared-types';
 
 /**
  * Sendblue API Error

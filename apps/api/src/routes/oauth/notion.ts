@@ -6,10 +6,10 @@ import {
   NotionOAuthError,
   createNotionClient,
   setupNotionDatabases,
-} from '@clarity/notion';
-import { users } from '@clarity/database';
+} from '@gtd/notion';
+import { users } from '@gtd/database';
 import { eq } from 'drizzle-orm';
-import type { DbClient } from '@clarity/database';
+import type { DbClient } from '@gtd/database';
 
 /**
  * Notion OAuth configuration
@@ -140,7 +140,7 @@ export function createNotionOAuthRoutes(config: NotionOAuthRoutesConfig): Fastif
           <!DOCTYPE html>
           <html>
           <head>
-            <title>Connected! - Clarity</title>
+            <title>Connected! - GTD</title>
             <meta name="viewport" content="width=device-width, initial-scale=1">
             <style>
               body {
@@ -170,7 +170,7 @@ export function createNotionOAuthRoutes(config: NotionOAuthRoutesConfig): Fastif
             <div class="card">
               <h1>🎉</h1>
               <h2>Connected to Notion!</h2>
-              <p>Your workspace "${tokenResponse.workspace_name}" is now linked to Clarity.</p>
+              <p>Your workspace "${tokenResponse.workspace_name}" is now linked to GTD.</p>
               <p>You can close this page and go back to SMS.</p>
             </div>
           </body>

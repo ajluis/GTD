@@ -1,4 +1,4 @@
-import type { NotionOAuthTokenResponse } from '@clarity/shared-types';
+import type { NotionOAuthTokenResponse } from '@gtd/shared-types';
 
 /**
  * Notion OAuth Configuration
@@ -27,7 +27,7 @@ export class NotionOAuthError extends Error {
  * Generate Notion OAuth authorization URL
  *
  * This URL should be sent to users to begin the OAuth flow.
- * When clicked, users will be taken to Notion to authorize Clarity.
+ * When clicked, users will be taken to Notion to authorize GTD.
  *
  * @param config - OAuth configuration
  * @param state - Optional state parameter for CSRF protection

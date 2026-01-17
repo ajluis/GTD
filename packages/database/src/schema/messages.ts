@@ -1,6 +1,6 @@
 import { pgTable, uuid, text, timestamp, pgEnum, jsonb, index } from 'drizzle-orm/pg-core';
 import { users } from './users.js';
-import type { ClassificationResult } from '@clarity/shared-types';
+import type { ClassificationResult } from '@gtd/shared-types';
 
 /**
  * Message direction enum
@@ -36,7 +36,7 @@ export const messages = pgTable(
     /** Message text content */
     content: text('content').notNull(),
 
-    /** Direction: inbound (from user) or outbound (from Clarity) */
+    /** Direction: inbound (from user) or outbound (from GTD) */
     direction: messageDirectionEnum('direction').notNull(),
 
     /** Delivery status */

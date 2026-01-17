@@ -1,4 +1,4 @@
-import { users, people, tasks } from '@clarity/database';
+import { users, people, tasks } from '@gtd/database';
 import { eq, desc } from 'drizzle-orm';
 import {
   createNotionClient,
@@ -8,9 +8,9 @@ import {
   markDiscussed,
   extractTaskTitle,
   isTaskDueToday,
-} from '@clarity/notion';
-import { formatTaskComplete } from '@clarity/gtd';
-import type { IntentEntities } from '@clarity/shared-types';
+} from '@gtd/notion';
+import { formatTaskComplete } from '@gtd/gtd';
+import type { IntentEntities } from '@gtd/shared-types';
 import type { HandlerContext } from './intents.js';
 
 /**

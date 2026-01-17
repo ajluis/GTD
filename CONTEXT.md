@@ -1,10 +1,10 @@
-# Clarity GTD - Project Context
+# GTD - Project Context
 
 > A GTD (Getting Things Done) assistant that works via SMS, using AI to classify messages and sync tasks to Notion.
 
 ## Overview
 
-Clarity is an SMS-based task management system. Users text tasks to a phone number, and an AI (Gemini) classifies them into GTD categories, then syncs them to the user's Notion workspace.
+GTD is an SMS-based task management system. Users text tasks to a phone number, and an AI (Gemini) classifies them into GTD categories, then syncs them to the user's Notion workspace.
 
 **Core Flow:**
 ```
@@ -293,10 +293,10 @@ DATABASE_URL="..." pnpm drizzle-kit push
 docker run -d -p 6379:6379 redis
 
 # Start API
-pnpm --filter @clarity/api dev
+pnpm --filter @gtd/api dev
 
 # Start Worker
-pnpm --filter @clarity/worker dev
+pnpm --filter @gtd/worker dev
 
 # Build all
 pnpm build
@@ -326,7 +326,7 @@ git status
 pnpm build
 
 # Run specific package
-pnpm --filter @clarity/worker dev
+pnpm --filter @gtd/worker dev
 
 # Push database schema
 cd packages/database && DATABASE_URL="..." pnpm drizzle-kit push

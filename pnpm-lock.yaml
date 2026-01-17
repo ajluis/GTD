@@ -26,24 +26,24 @@ importers:
 
   apps/api:
     dependencies:
-      '@clarity/database':
-        specifier: workspace:*
-        version: link:../../packages/database
-      '@clarity/notion':
-        specifier: workspace:*
-        version: link:../../packages/notion
-      '@clarity/queue':
-        specifier: workspace:*
-        version: link:../../packages/queue
-      '@clarity/sendblue':
-        specifier: workspace:*
-        version: link:../../packages/sendblue
-      '@clarity/shared-types':
-        specifier: workspace:*
-        version: link:../../packages/shared-types
       '@fastify/cors':
         specifier: ^9.0.1
         version: 9.0.1
+      '@gtd/database':
+        specifier: workspace:*
+        version: link:../../packages/database
+      '@gtd/notion':
+        specifier: workspace:*
+        version: link:../../packages/notion
+      '@gtd/queue':
+        specifier: workspace:*
+        version: link:../../packages/queue
+      '@gtd/sendblue':
+        specifier: workspace:*
+        version: link:../../packages/sendblue
+      '@gtd/shared-types':
+        specifier: workspace:*
+        version: link:../../packages/shared-types
       bullmq:
         specifier: ^5.30.0
         version: 5.66.5
@@ -66,19 +66,19 @@ importers:
 
   apps/scheduler:
     dependencies:
-      '@clarity/database':
+      '@gtd/database':
         specifier: workspace:*
         version: link:../../packages/database
-      '@clarity/gtd':
+      '@gtd/gtd':
         specifier: workspace:*
         version: link:../../packages/gtd
-      '@clarity/notion':
+      '@gtd/notion':
         specifier: workspace:*
         version: link:../../packages/notion
-      '@clarity/queue':
+      '@gtd/queue':
         specifier: workspace:*
         version: link:../../packages/queue
-      '@clarity/shared-types':
+      '@gtd/shared-types':
         specifier: workspace:*
         version: link:../../packages/shared-types
       bullmq:
@@ -109,28 +109,28 @@ importers:
 
   apps/worker:
     dependencies:
-      '@clarity/ai':
+      '@gtd/ai':
         specifier: workspace:*
         version: link:../../packages/ai
-      '@clarity/database':
+      '@gtd/database':
         specifier: workspace:*
         version: link:../../packages/database
-      '@clarity/gtd':
+      '@gtd/gtd':
         specifier: workspace:*
         version: link:../../packages/gtd
-      '@clarity/notion':
+      '@gtd/notion':
         specifier: workspace:*
         version: link:../../packages/notion
-      '@clarity/queue':
+      '@gtd/queue':
         specifier: workspace:*
         version: link:../../packages/queue
-      '@clarity/sendblue':
+      '@gtd/sendblue':
         specifier: workspace:*
         version: link:../../packages/sendblue
-      '@clarity/shared-types':
+      '@gtd/shared-types':
         specifier: workspace:*
         version: link:../../packages/shared-types
-      '@clarity/todoist':
+      '@gtd/todoist':
         specifier: workspace:*
         version: link:../../packages/todoist
       bullmq:
@@ -152,12 +152,12 @@ importers:
 
   packages/ai:
     dependencies:
-      '@clarity/shared-types':
-        specifier: workspace:*
-        version: link:../shared-types
       '@google/generative-ai':
         specifier: ^0.21.0
         version: 0.21.0
+      '@gtd/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
     devDependencies:
       typescript:
         specifier: ^5.3.3
@@ -165,7 +165,7 @@ importers:
 
   packages/database:
     dependencies:
-      '@clarity/shared-types':
+      '@gtd/shared-types':
         specifier: workspace:*
         version: link:../shared-types
       drizzle-orm:
@@ -184,7 +184,7 @@ importers:
 
   packages/gtd:
     dependencies:
-      '@clarity/shared-types':
+      '@gtd/shared-types':
         specifier: workspace:*
         version: link:../shared-types
     devDependencies:
@@ -194,7 +194,7 @@ importers:
 
   packages/notion:
     dependencies:
-      '@clarity/shared-types':
+      '@gtd/shared-types':
         specifier: workspace:*
         version: link:../shared-types
       '@notionhq/client':
@@ -214,7 +214,7 @@ importers:
         specifier: ^5.4.1
         version: 5.9.2
     devDependencies:
-      '@clarity/shared-types':
+      '@gtd/shared-types':
         specifier: workspace:*
         version: link:../shared-types
       typescript:
@@ -223,7 +223,7 @@ importers:
 
   packages/sendblue:
     dependencies:
-      '@clarity/shared-types':
+      '@gtd/shared-types':
         specifier: workspace:*
         version: link:../shared-types
     devDependencies:
@@ -239,7 +239,7 @@ importers:
 
   packages/todoist:
     dependencies:
-      '@clarity/shared-types':
+      '@gtd/shared-types':
         specifier: workspace:*
         version: link:../shared-types
     devDependencies:

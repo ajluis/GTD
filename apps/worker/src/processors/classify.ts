@@ -1,11 +1,11 @@
 import type { Job } from 'bullmq';
-import type { ClassifyJobData, MessageJobData } from '@clarity/queue';
-import { enqueueNotionSync, enqueueOutboundMessage } from '@clarity/queue';
+import type { ClassifyJobData, MessageJobData } from '@gtd/queue';
+import { enqueueNotionSync, enqueueOutboundMessage } from '@gtd/queue';
 import type { Queue } from 'bullmq';
-import type { DbClient } from '@clarity/database';
-import { users, messages, tasks, people, conversationStates } from '@clarity/database';
+import type { DbClient } from '@gtd/database';
+import { users, messages, tasks, people, conversationStates } from '@gtd/database';
 import { eq, desc, and } from 'drizzle-orm';
-import { createClassifier, findBestFuzzyMatch, formatDidYouMean, type ConversationMessage } from '@clarity/ai';
+import { createClassifier, findBestFuzzyMatch, formatDidYouMean, type ConversationMessage } from '@gtd/ai';
 import {
   createNotionClient,
   createPerson as createNotionPerson,
@@ -21,7 +21,7 @@ import {
   extractTaskTitle,
   extractTaskDueDate,
   isTaskDueToday,
-} from '@clarity/notion';
+} from '@gtd/notion';
 import {
   isCommand,
   parseCommand,
@@ -32,8 +32,8 @@ import {
   formatHelp,
   formatTaskList,
   formatTaskComplete,
-} from '@clarity/gtd';
-import type { PersonForMatching, ClassificationResult } from '@clarity/shared-types';
+} from '@gtd/gtd';
+import type { PersonForMatching, ClassificationResult } from '@gtd/shared-types';
 import { handleIntent, type HandlerContext } from '../handlers/intents.js';
 
 /**
@@ -698,7 +698,7 @@ async function handleCommand(
         const itemTitles = agendaItems.map((item, i) => `${i + 1}. ${extractTaskTitle(item)}`);
 
         // Mark all as discussed
-        const { markDiscussed } = await import('@clarity/notion');
+        const { markDiscussed } = await import('@gtd/notion');
         for (const item of agendaItems) {
           await markDiscussed(notion, item.id);
         }

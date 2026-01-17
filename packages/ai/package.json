@@ -1,5 +1,5 @@
 {
-  "name": "@clarity/ai",
+  "name": "@gtd/ai",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -18,7 +18,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@clarity/shared-types": "workspace:*",
+    "@gtd/shared-types": "workspace:*",
     "@google/generative-ai": "^0.21.0"
   },
   "devDependencies": {

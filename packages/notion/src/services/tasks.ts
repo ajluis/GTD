@@ -3,8 +3,8 @@ import {
   TASK_TYPE_TO_NOTION,
   CONTEXT_TO_NOTION,
   PRIORITY_TO_NOTION,
-} from '@clarity/shared-types';
-import type { TaskType, TaskContext, TaskPriority } from '@clarity/shared-types';
+} from '@gtd/shared-types';
+import type { TaskType, TaskContext, TaskPriority } from '@gtd/shared-types';
 
 /**
  * Task data for creating in Notion

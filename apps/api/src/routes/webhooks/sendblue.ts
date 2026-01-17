@@ -1,13 +1,13 @@
 import type { FastifyPluginAsync } from 'fastify';
-import type { SendblueWebhookPayload } from '@clarity/shared-types';
+import type { SendblueWebhookPayload } from '@gtd/shared-types';
 import {
   validateWebhookSignature,
   extractValidationHeaders,
   WebhookValidationError,
-} from '@clarity/sendblue';
-import { enqueueInboundMessage } from '@clarity/queue';
+} from '@gtd/sendblue';
+import { enqueueInboundMessage } from '@gtd/queue';
 import type { Queue } from 'bullmq';
-import type { MessageJobData } from '@clarity/queue';
+import type { MessageJobData } from '@gtd/queue';
 
 /**
  * Sendblue webhook configuration

@@ -1,6 +1,6 @@
 import type { TodoistClient } from '../client.js';
 import type { CreateTaskData, TodoistTask, TodoistProject, TodoistLabel } from '../types.js';
-import type { TaskType, TaskContext, TaskPriority } from '@clarity/shared-types';
+import type { TaskType, TaskContext, TaskPriority } from '@gtd/shared-types';
 
 /**
  * Map GTD context to Todoist label name

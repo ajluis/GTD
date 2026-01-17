@@ -1,11 +1,11 @@
 import type { Job } from 'bullmq';
-import type { InboundMessageJobData, MessageJobData } from '@clarity/queue';
-import { enqueueClassification, enqueueOutboundMessage } from '@clarity/queue';
+import type { InboundMessageJobData, MessageJobData } from '@gtd/queue';
+import { enqueueClassification, enqueueOutboundMessage } from '@gtd/queue';
 import type { Queue } from 'bullmq';
-import type { DbClient } from '@clarity/database';
-import { users, messages } from '@clarity/database';
+import type { DbClient } from '@gtd/database';
+import { users, messages } from '@gtd/database';
 import { eq } from 'drizzle-orm';
-import { formatWelcome } from '@clarity/gtd';
+import { formatWelcome } from '@gtd/gtd';
 
 /**
  * Inbound Message Processor
@@ -111,7 +111,7 @@ export function createInboundProcessor(
       await enqueueOutboundMessage(messageQueue, {
         userId: user.id,
         toNumber: fromNumber,
-        content: "Your Clarity account is paused. Reply 'activate' to resume.",
+        content: "Your GTD account is paused. Reply 'activate' to resume.",
       });
     }
 

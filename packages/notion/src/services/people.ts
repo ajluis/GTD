@@ -1,6 +1,6 @@
 import type { Client } from '@notionhq/client';
-import { FREQUENCY_TO_NOTION, DAY_TO_NOTION } from '@clarity/shared-types';
-import type { MeetingFrequency, DayOfWeek, PersonForMatching } from '@clarity/shared-types';
+import { FREQUENCY_TO_NOTION, DAY_TO_NOTION } from '@gtd/shared-types';
+import type { MeetingFrequency, DayOfWeek, PersonForMatching } from '@gtd/shared-types';
 
 /**
  * Person data for creating in Notion

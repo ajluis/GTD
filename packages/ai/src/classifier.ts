@@ -4,7 +4,7 @@ import type {
   IntentResult,
   IntentType,
   IntentEntities,
-} from '@clarity/shared-types';
+} from '@gtd/shared-types';
 import { GeminiClient, createGeminiClient } from './gemini-client.js';
 import {
   buildClassificationPrompt,

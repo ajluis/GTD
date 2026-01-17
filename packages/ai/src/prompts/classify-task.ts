@@ -1,4 +1,4 @@
-import type { PersonForMatching } from '@clarity/shared-types';
+import type { PersonForMatching } from '@gtd/shared-types';
 
 /**
  * Conversation message for context
@@ -53,11 +53,11 @@ export function buildClassificationPrompt(
   const recentHistory = conversationHistory.slice(-6);
   const conversationContext = recentHistory.length > 0
     ? recentHistory
-        .map((msg) => `[${msg.role === 'user' ? 'USER' : 'CLARITY'}]: ${msg.content}`)
+        .map((msg) => `[${msg.role === 'user' ? 'USER' : 'GTD'}]: ${msg.content}`)
         .join('\n')
     : '(No recent conversation)';
 
-  return `You are Clarity, a GTD (Getting Things Done) assistant that helps users via SMS.
+  return `You are a GTD (Getting Things Done) assistant that helps users via SMS.
 
 CURRENT CONTEXT:
 - Today: ${dateString} (${isoDate}), ${dayOfWeek}
@@ -105,8 +105,8 @@ INTENT DETECTION (check FIRST)
    │
    │ IMPORTANT: Use RECENT CONVERSATION to resolve "that", "it", "the first one":
    │ - If user just saw a task list and says "done" or "finished that" →
-   │   Look at what CLARITY showed them and extract the task name!
-   │ - Example: CLARITY showed "🔥 TODAY: • Call Rob" then USER says "finished that"
+   │   Look at what GTD showed them and extract the task name!
+   │ - Example: GTD showed "🔥 TODAY: • Call Rob" then USER says "finished that"
    │   → This is complete_task with taskText: "Call Rob" (NOT complete_recent!)
    │ - If multiple tasks were shown and user says "the second one" →
    │   Extract the second task from the list
@@ -156,11 +156,11 @@ INTENT DETECTION (check FIRST)
    │ IMPORTANT - "undo", "remove that", "take that back", "never mind":
    │ Use RECENT CONVERSATION to determine the right action:
    │
-   │ • If CLARITY just confirmed a NEW TASK → use delete_task
-   │   Example: CLARITY showed "✅ Action: 'Call dentist'" then USER says "undo"
+   │ • If GTD just confirmed a NEW TASK → use delete_task
+   │   Example: GTD showed "✅ Action: 'Call dentist'" then USER says "undo"
    │   → delete_task with taskText: "Call dentist"
    │
-   │ • If CLARITY just confirmed TASK COMPLETED → use uncomplete_task (not implemented yet)
+   │ • If GTD just confirmed TASK COMPLETED → use uncomplete_task (not implemented yet)
    │   For now, tell user: "To restore a completed task, find it in Notion"
    │
    │ • If no clear recent action → show_help

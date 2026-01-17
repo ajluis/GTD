@@ -61,7 +61,7 @@ async function main() {
   if (!token || !parentPageId || !peopleDbId) {
     console.error('Missing required environment variables:');
     console.error('  NOTION_ACCESS_TOKEN - Your Notion integration token');
-    console.error('  PARENT_PAGE_ID - The Clarity GTD page ID');
+    console.error('  PARENT_PAGE_ID - The GTD page ID');
     console.error('  PEOPLE_DB_ID - The People database ID');
     process.exit(1);
   }

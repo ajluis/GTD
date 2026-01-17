@@ -2,7 +2,7 @@
 /**
  * Notion Database Setup Script
  *
- * Run this script to create the required Notion databases for Clarity.
+ * Run this script to create the required Notion databases for GTD.
  * Requires NOTION_ACCESS_TOKEN environment variable.
  *
  * Usage:
@@ -96,7 +96,7 @@ async function main() {
     process.exit(1);
   }
 
-  console.log('🚀 Setting up Notion databases for Clarity...\n');
+  console.log('🚀 Setting up Notion databases for GTD...\n');
 
   const notion = new Client({ auth: token });
 
@@ -116,13 +116,13 @@ async function main() {
   const parentPage = searchResponse.results[0]!;
   console.log(`✅ Found accessible page: ${parentPage.id}\n`);
 
-  // Step 2: Create Clarity GTD page
-  console.log('📝 Creating "Clarity GTD" page...');
-  const clarityPage = await notion.pages.create({
+  // Step 2: Create GTD page
+  console.log('📝 Creating "GTD" page...');
+  const gtdPage = await notion.pages.create({
     parent: { page_id: parentPage.id },
     properties: {
       title: {
-        title: [{ text: { content: 'Clarity GTD' } }],
+        title: [{ text: { content: 'GTD' } }],
       },
     },
     children: [
@@ -134,7 +134,7 @@ async function main() {
             {
               type: 'text',
               text: {
-                content: 'This page contains your GTD system managed by Clarity. Text your tasks and they appear here! ✨',
+                content: 'This page contains your GTD system managed by GTD. Text your tasks and they appear here! ✨',
               },
             },
           ],
@@ -144,12 +144,12 @@ async function main() {
       },
     ],
   });
-  console.log(`✅ Created page: ${clarityPage.id}\n`);
+  console.log(`✅ Created page: ${gtdPage.id}\n`);
 
   // Step 3: Create People database
   console.log('👥 Creating "People" database...');
   const peopleDb = await notion.databases.create({
-    parent: { page_id: clarityPage.id },
+    parent: { page_id: gtdPage.id },
     title: [{ type: 'text', text: { content: '👥 People' } }],
     is_inline: true,
     properties: PEOPLE_DATABASE_PROPERTIES as any,
@@ -167,7 +167,7 @@ async function main() {
   };
 
   const tasksDb = await notion.databases.create({
-    parent: { page_id: clarityPage.id },
+    parent: { page_id: gtdPage.id },
     title: [{ type: 'text', text: { content: '📋 Tasks' } }],
     is_inline: true,
     properties: tasksProperties,

@@ -1,15 +1,15 @@
 import type { Queue } from 'bullmq';
-import type { DbClient } from '@clarity/database';
-import { users } from '@clarity/database';
+import type { DbClient } from '@gtd/database';
+import { users } from '@gtd/database';
 import { eq, and, isNotNull } from 'drizzle-orm';
-import { enqueueOutboundMessage } from '@clarity/queue';
-import type { MessageJobData } from '@clarity/queue';
+import { enqueueOutboundMessage } from '@gtd/queue';
+import type { MessageJobData } from '@gtd/queue';
 import {
   createNotionClient,
   queryWaitingTasks,
   extractTaskTitle,
   extractTaskDueDate,
-} from '@clarity/notion';
+} from '@gtd/notion';
 
 /**
  * Waiting Follow-up Job

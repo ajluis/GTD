@@ -1,4 +1,4 @@
-import type { TaskType, TaskContext, TaskPriority, ClassificationResult } from '@clarity/shared-types';
+import type { TaskType, TaskContext, TaskPriority, ClassificationResult } from '@gtd/shared-types';
 
 /**
  * SMS Message Limits
@@ -183,7 +183,7 @@ export function formatWaitingFollowup(title: string): string {
  * Format onboarding welcome message
  */
 export function formatWelcome(oauthUrl: string): string {
-  return `Hey! 👋 I'm Clarity — your GTD assistant.\n\nText me tasks, ideas, or things to discuss with people. I'll organize everything in Notion.\n\nLet's connect your workspace:\n${oauthUrl}`;
+  return `Hey! 👋 I'm GTD — your GTD assistant.\n\nText me tasks, ideas, or things to discuss with people. I'll organize everything in Notion.\n\nLet's connect your workspace:\n${oauthUrl}`;
 }
 
 /**

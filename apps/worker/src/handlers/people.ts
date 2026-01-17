@@ -1,7 +1,7 @@
-import { people } from '@clarity/database';
+import { people } from '@gtd/database';
 import { eq } from 'drizzle-orm';
-import { createNotionClient, createPerson as createNotionPerson } from '@clarity/notion';
-import type { IntentEntities, MeetingFrequency, DayOfWeek } from '@clarity/shared-types';
+import { createNotionClient, createPerson as createNotionPerson } from '@gtd/notion';
+import type { IntentEntities, MeetingFrequency, DayOfWeek } from '@gtd/shared-types';
 import type { HandlerContext } from './intents.js';
 
 /**

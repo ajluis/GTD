@@ -1,7 +1,7 @@
 # LLM-Driven Intent Detection - Implementation Plan
 
 ## Overview
-Transform Clarity from command-based to conversation-based by having the LLM understand user intent and route to appropriate actions.
+Transform GTD from command-based to conversation-based by having the LLM understand user intent and route to appropriate actions.
 
 ## Architecture
 

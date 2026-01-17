@@ -1,4 +1,4 @@
-import type { IntentEntities } from '@clarity/shared-types';
+import type { IntentEntities } from '@gtd/shared-types';
 import type { HandlerContext } from './intents.js';
 
 /**

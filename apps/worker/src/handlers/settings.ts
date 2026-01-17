@@ -1,6 +1,6 @@
-import { users } from '@clarity/database';
+import { users } from '@gtd/database';
 import { eq } from 'drizzle-orm';
-import type { IntentEntities } from '@clarity/shared-types';
+import type { IntentEntities } from '@gtd/shared-types';
 import type { HandlerContext } from './intents.js';
 
 /**

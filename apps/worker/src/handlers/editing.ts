@@ -1,11 +1,11 @@
-import type { IntentEntities } from '@clarity/shared-types';
-import { PRIORITY_TO_NOTION, CONTEXT_TO_NOTION } from '@clarity/shared-types';
+import type { IntentEntities } from '@gtd/shared-types';
+import { PRIORITY_TO_NOTION, CONTEXT_TO_NOTION } from '@gtd/shared-types';
 import type { HandlerContext } from './intents.js';
 import {
   createNotionClient,
   findTaskByText,
   extractTaskTitle,
-} from '@clarity/notion';
+} from '@gtd/notion';
 
 /**
  * Handle reschedule_task intent

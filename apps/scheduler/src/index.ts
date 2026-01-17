@@ -1,13 +1,13 @@
 import cron from 'node-cron';
 import type { ConnectionOptions } from 'bullmq';
-import { createDbClient } from '@clarity/database';
-import { createMessageQueue, createWorkerConnection } from '@clarity/queue';
+import { createDbClient } from '@gtd/database';
+import { createMessageQueue, createWorkerConnection } from '@gtd/queue';
 import { runDailyDigest } from './jobs/daily-digest.js';
 import { runMeetingReminders } from './jobs/meeting-reminder.js';
 import { runWaitingFollowups } from './jobs/waiting-followup.js';
 
 /**
- * Clarity Scheduler
+ * GTD Scheduler
  *
  * Runs scheduled jobs for:
  * - Daily digest messages (morning summary of tasks)
@@ -27,7 +27,7 @@ if (!DATABASE_URL) {
 }
 
 async function main() {
-  console.log('[Scheduler] Starting Clarity Scheduler...');
+  console.log('[Scheduler] Starting GTD Scheduler...');
 
   // Create database connection (DATABASE_URL validated above)
   const db = createDbClient(DATABASE_URL!);

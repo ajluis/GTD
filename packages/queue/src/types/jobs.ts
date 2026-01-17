@@ -1,11 +1,11 @@
-import type { ClassificationResult } from '@clarity/shared-types';
+import type { ClassificationResult } from '@gtd/shared-types';
 
 /**
  * Queue Names
  */
 export const QUEUE_NAMES = {
-  MESSAGES: 'clarity-messages',
-  NOTIFICATIONS: 'clarity-notifications',
+  MESSAGES: 'gtd-messages',
+  NOTIFICATIONS: 'gtd-notifications',
 } as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];

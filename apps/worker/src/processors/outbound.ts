@@ -1,9 +1,9 @@
 import type { Job } from 'bullmq';
-import type { OutboundMessageJobData } from '@clarity/queue';
-import type { DbClient } from '@clarity/database';
-import { messages } from '@clarity/database';
-import { createSendblueClient, type SendblueClient } from '@clarity/sendblue';
-import { splitMessage } from '@clarity/gtd';
+import type { OutboundMessageJobData } from '@gtd/queue';
+import type { DbClient } from '@gtd/database';
+import { messages } from '@gtd/database';
+import { createSendblueClient, type SendblueClient } from '@gtd/sendblue';
+import { splitMessage } from '@gtd/gtd';
 
 /**
  * Outbound Message Processor

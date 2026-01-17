@@ -1,14 +1,14 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import type { ConnectionOptions } from 'bullmq';
-import { createDbClient } from '@clarity/database';
-import { createRedisConnection, createMessageQueue } from '@clarity/queue';
+import { createDbClient } from '@gtd/database';
+import { createRedisConnection, createMessageQueue } from '@gtd/queue';
 import { healthRoutes } from './routes/health.js';
 import { createSendblueWebhook } from './routes/webhooks/sendblue.js';
 import { createNotionOAuthRoutes } from './routes/oauth/notion.js';
 
 /**
- * Clarity API Server
+ * GTD API Server
  *
  * Handles:
  * - Sendblue webhook for incoming SMS

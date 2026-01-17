@@ -1,18 +1,18 @@
 import { Worker, type Job, type ConnectionOptions } from 'bullmq';
-import { createDbClient } from '@clarity/database';
+import { createDbClient } from '@gtd/database';
 import {
   createWorkerConnection,
   createMessageQueue,
   QUEUE_NAMES,
   type MessageJobData,
-} from '@clarity/queue';
+} from '@gtd/queue';
 import { createInboundProcessor } from './processors/inbound.js';
 import { createClassifyProcessor } from './processors/classify.js';
 import { createNotionSyncProcessor } from './processors/notion-sync.js';
 import { createOutboundProcessor } from './processors/outbound.js';
 
 /**
- * Clarity Worker
+ * GTD Worker
  *
  * Processes background jobs:
  * - Inbound message handling
@@ -38,7 +38,7 @@ async function main() {
     }
   }
 
-  console.log('[Worker] Starting Clarity message worker...');
+  console.log('[Worker] Starting GTD message worker...');
 
   // Initialize database
   const db = createDbClient(config.databaseUrl);

@@ -7,7 +7,7 @@
  * - "Did you mean?" confirmations
  */
 
-import type { PersonForMatching } from '@clarity/shared-types';
+import type { PersonForMatching } from '@gtd/shared-types';
 
 /**
  * Result of a fuzzy person match

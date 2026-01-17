@@ -1,9 +1,9 @@
 import type { Job } from 'bullmq';
-import type { NotionSyncJobData } from '@clarity/queue';
-import type { DbClient } from '@clarity/database';
-import { users, tasks, people } from '@clarity/database';
+import type { NotionSyncJobData } from '@gtd/queue';
+import type { DbClient } from '@gtd/database';
+import { users, tasks, people } from '@gtd/database';
 import { eq } from 'drizzle-orm';
-import { createTodoistClient, createTask as createTodoistTask } from '@clarity/todoist';
+import { createTodoistClient, createTask as createTodoistTask } from '@gtd/todoist';
 
 /**
  * Todoist Sync Processor

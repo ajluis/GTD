@@ -1,5 +1,5 @@
 {
-  "name": "@clarity/worker",
+  "name": "@gtd/worker",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -12,14 +12,14 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@clarity/ai": "workspace:*",
-    "@clarity/database": "workspace:*",
-    "@clarity/gtd": "workspace:*",
-    "@clarity/notion": "workspace:*",
-    "@clarity/todoist": "workspace:*",
-    "@clarity/queue": "workspace:*",
-    "@clarity/sendblue": "workspace:*",
-    "@clarity/shared-types": "workspace:*",
+    "@gtd/ai": "workspace:*",
+    "@gtd/database": "workspace:*",
+    "@gtd/gtd": "workspace:*",
+    "@gtd/notion": "workspace:*",
+    "@gtd/todoist": "workspace:*",
+    "@gtd/queue": "workspace:*",
+    "@gtd/sendblue": "workspace:*",
+    "@gtd/shared-types": "workspace:*",
     "bullmq": "^5.30.0",
     "drizzle-orm": "^0.38.0",
     "ioredis": "^5.4.1"

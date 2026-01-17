@@ -1,5 +1,5 @@
 {
-  "name": "@clarity/queue",
+  "name": "@gtd/queue",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -22,7 +22,7 @@
     "ioredis": "^5.4.1"
   },
   "devDependencies": {
-    "@clarity/shared-types": "workspace:*",
+    "@gtd/shared-types": "workspace:*",
     "typescript": "^5.3.3"
   }
 }

@@ -2,7 +2,7 @@ import type { Client } from '@notionhq/client';
 import {
   TASKS_DATABASE_PROPERTIES,
   PEOPLE_DATABASE_PROPERTIES,
-} from '@clarity/shared-types';
+} from '@gtd/shared-types';
 
 /**
  * Database setup result
@@ -14,18 +14,18 @@ export interface DatabaseSetupResult {
 }
 
 /**
- * Find or create a page to house Clarity databases
+ * Find or create a page to house GTD databases
  *
- * Looks for an existing "Clarity GTD" page, or creates one if not found.
+ * Looks for an existing "GTD" page, or creates one if not found.
  * This page will contain the Tasks and People databases.
  *
  * @param notion - Notion client
  * @returns Page ID
  */
-async function findOrCreateClarityPage(notion: Client): Promise<string> {
-  // Search for existing Clarity page
+async function findOrCreateGTDPage(notion: Client): Promise<string> {
+  // Search for existing GTD page
   const searchResponse = await notion.search({
-    query: 'Clarity GTD',
+    query: 'GTD',
     filter: { property: 'object', value: 'page' },
     page_size: 10,
   });
@@ -34,7 +34,7 @@ async function findOrCreateClarityPage(notion: Client): Promise<string> {
   for (const result of searchResponse.results) {
     if (result.object === 'page' && 'properties' in result) {
       const titleProp = (result.properties as any)?.title;
-      if (titleProp?.title?.[0]?.plain_text === 'Clarity GTD') {
+      if (titleProp?.title?.[0]?.plain_text === 'GTD') {
         return result.id;
       }
     }
@@ -53,18 +53,18 @@ async function findOrCreateClarityPage(notion: Client): Promise<string> {
 
   if (anyPage.results.length === 0) {
     throw new Error(
-      'No pages accessible. Please share at least one page with Clarity during Notion authorization.'
+      'No pages accessible. Please share at least one page with GTD during Notion authorization.'
     );
   }
 
   const parentId = anyPage.results[0]!.id;
 
-  // Create the Clarity GTD page
+  // Create the GTD page
   const page = await notion.pages.create({
     parent: { page_id: parentId },
     properties: {
       title: {
-        title: [{ text: { content: 'Clarity GTD' } }],
+        title: [{ text: { content: 'GTD' } }],
       },
     },
     children: [
@@ -77,7 +77,7 @@ async function findOrCreateClarityPage(notion: Client): Promise<string> {
               type: 'text',
               text: {
                 content:
-                  'This page contains your GTD system managed by Clarity. Text your tasks and they appear here!',
+                  'This page contains your GTD system managed by GTD. Text your tasks and they appear here!',
               },
             },
           ],
@@ -138,10 +138,10 @@ async function createPeopleDatabase(
 }
 
 /**
- * Set up Clarity databases in user's Notion workspace
+ * Set up GTD databases in user's Notion workspace
  *
  * Creates:
- * 1. A "Clarity GTD" page to contain everything
+ * 1. A "GTD" page to contain everything
  * 2. A "📋 Tasks" database with full GTD schema
  * 3. A "👥 People" database for agenda routing
  *
@@ -152,7 +152,7 @@ export async function setupNotionDatabases(
   notion: Client
 ): Promise<DatabaseSetupResult> {
   // Find or create the parent page
-  const parentPageId = await findOrCreateClarityPage(notion);
+  const parentPageId = await findOrCreateGTDPage(notion);
 
   // Create People database first (Tasks will reference it)
   const peopleDbId = await createPeopleDatabase(notion, parentPageId);

@@ -1,7 +1,7 @@
 import type { Queue } from 'bullmq';
-import type { DbClient } from '@clarity/database';
-import type { MessageJobData } from '@clarity/queue';
-import type { IntentResult } from '@clarity/shared-types';
+import type { DbClient } from '@gtd/database';
+import type { MessageJobData } from '@gtd/queue';
+import type { IntentResult } from '@gtd/shared-types';
 
 // Import handlers
 import {
