@@ -23,6 +23,7 @@ COPY packages/sendblue/package.json ./packages/sendblue/
 COPY packages/notion/package.json ./packages/notion/
 COPY packages/ai/package.json ./packages/ai/
 COPY packages/gtd/package.json ./packages/gtd/
+COPY packages/todoist/package.json ./packages/todoist/
 COPY apps/api/package.json ./apps/api/
 COPY apps/worker/package.json ./apps/worker/
 
