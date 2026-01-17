@@ -72,9 +72,32 @@ export function createInboundProcessor(
       })
       .where(eq(users.id, user.id));
 
-    // 4. Route based on user status
-    if (user.status === 'onboarding') {
-      // Handle onboarding flow
+    // 4. Check if using internal Notion integration (no OAuth needed)
+    const isInternalIntegration = !process.env['NOTION_CLIENT_ID'] && process.env['NOTION_ACCESS_TOKEN'];
+
+    // 5. Route based on user status
+    if (user.status === 'onboarding' && isInternalIntegration) {
+      // Auto-activate user for internal integration mode
+      console.log(`[Inbound] Auto-activating user ${user.id} (internal integration mode)`);
+      await db
+        .update(users)
+        .set({
+          status: 'active',
+          notionAccessToken: process.env['NOTION_ACCESS_TOKEN'],
+          notionTasksDatabaseId: process.env['NOTION_TASKS_DATABASE_ID'],
+          notionPeopleDatabaseId: process.env['NOTION_PEOPLE_DATABASE_ID'],
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, user.id));
+
+      // Now process the message as if user was active
+      await enqueueClassification(messageQueue, {
+        userId: user.id,
+        messageId: message!.id,
+        content,
+      });
+    } else if (user.status === 'onboarding') {
+      // Handle OAuth onboarding flow
       await handleOnboarding(user, content, messageQueue, appUrl);
     } else if (user.status === 'active') {
       // Classify message and process
