@@ -2,6 +2,8 @@
 
 > A GTD (Getting Things Done) assistant that works via SMS, using AI to classify messages and sync tasks to Notion.
 
+**IMPORTANT:** Update this file before every `git push` to keep context current for future sessions.
+
 ## Overview
 
 GTD is an SMS-based task management system. Users text tasks to a phone number, and an AI (Gemini) classifies them into GTD categories, then syncs them to the user's Notion workspace.
@@ -54,7 +56,10 @@ Creates task in PostgreSQL → Syncs to Notion → Sends confirmation SMS back
 > **Note:** These 4 files work together. When changing the classifier interface, update ALL of them:
 - `packages/ai/src/index.ts` - Package exports (must export new types)
 - `packages/ai/src/classifier.ts` - Main GTD classifier using Gemini
+  - `classify(message, people, time, history, mode)` - mode: 'classify' | 'extract'
+  - `cleanupTaskTitle()` - Defensive title cleanup
 - `packages/ai/src/prompts/classify-task.ts` - LLM prompt with intent detection + types
+  - Includes extraction mode instructions when `mode === 'extract'`
 - `packages/ai/src/fuzzy-match.ts` - Levenshtein distance for name matching
 
 ### Message Processing
@@ -262,15 +267,29 @@ Both Dockerfiles need the scheduler's package.json in the deps stage for the mon
 - [x] Follow-up questions for vague tasks
 - [x] Scheduler app for daily digest/reminders
 - [x] Conversation history for AI context (resolves "that", "it", "the first one")
+- [x] Extraction mode for re-classification after clarification
+- [x] Defensive title cleanup (removes "Let's", "I need to", etc.)
+- [x] Auto-create people when user provides info about unknown person
+- [x] Professional WAITING task titles (e.g., "Person to deliver X")
+- [x] Context guidance in prompt (calls for quick phone tasks, computer for dense work)
+
+### Classifier Modes
+The classifier has two modes (passed as 5th parameter):
+- `'classify'` (default) - Normal classification, may return `needs_clarification`
+- `'extract'` - Used after user clarification, ALWAYS returns task type, extracts all fields
+
+This prevents re-classification from returning `needs_clarification` with undefined fields.
+
+### Title Cleanup
+The `cleanupTaskTitle()` function in `classifier.ts` defensively strips casual prefixes:
+- "Let's ask Sam..." → "Ask Sam..."
+- "I need to call dentist" → "Call dentist"
+- "Can you add..." → removes prefix
+
+Applied in `normalizeTaskResult()` even if LLM ignores prompt instructions.
 
 ### Known Issues
-1. **conversation_states table** - Missing `state_type` column in production. Run:
-   ```sql
-   ALTER TABLE conversation_states
-   ADD COLUMN IF NOT EXISTS state_type TEXT NOT NULL DEFAULT 'unknown';
-   ```
-
-2. **Notion Status filter** - Uses `select` type, not native `status` type
+1. **Notion Status filter** - Uses `select` type, not native `status` type
 
 ### TODOs
 - [ ] Implement undo functionality (needs action history)
@@ -337,4 +356,4 @@ railway logs
 
 ---
 
-*Last updated: January 17, 2026*
+*Last updated: January 17, 2026 (session 2 - extraction mode fix)*
