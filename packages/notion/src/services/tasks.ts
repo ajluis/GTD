@@ -40,7 +40,7 @@ export async function createTask(
       select: { name: TASK_TYPE_TO_NOTION[data.type] ?? 'Action' },
     },
     Status: {
-      status: { name: 'To Do' },
+      select: { name: 'To Do' },
     },
     Created: {
       date: { start: new Date().toISOString().split('T')[0] },
@@ -100,7 +100,7 @@ export async function completeTask(
     page_id: pageId,
     properties: {
       Status: {
-        status: { name: 'Done' },
+        select: { name: 'Done' },
       },
       Completed: {
         date: { start: new Date().toISOString().split('T')[0] },
@@ -123,7 +123,7 @@ export async function markDiscussed(
     page_id: pageId,
     properties: {
       Status: {
-        status: { name: 'Discussed' },
+        select: { name: 'Discussed' },
       },
     } as any,
   });

@@ -8,7 +8,7 @@ import {
 } from '@clarity/queue';
 import { createInboundProcessor } from './processors/inbound.js';
 import { createClassifyProcessor } from './processors/classify.js';
-import { createTodoistSyncProcessor } from './processors/todoist-sync.js';
+import { createNotionSyncProcessor } from './processors/notion-sync.js';
 import { createOutboundProcessor } from './processors/outbound.js';
 
 /**
@@ -56,7 +56,7 @@ async function main() {
   // Create processors
   const inboundProcessor = createInboundProcessor(db, messageQueue, config.appUrl);
   const classifyProcessor = createClassifyProcessor(db, messageQueue);
-  const todoistSyncProcessor = createTodoistSyncProcessor(db);
+  const notionSyncProcessor = createNotionSyncProcessor(db);
   const outboundProcessor = createOutboundProcessor(db);
 
   // Create worker
@@ -73,7 +73,7 @@ async function main() {
         case 'classify':
           return classifyProcessor(job as any);
         case 'notion-sync':
-          return todoistSyncProcessor(job as any);
+          return notionSyncProcessor(job as any);
         case 'outbound':
           return outboundProcessor(job as any);
         default:
