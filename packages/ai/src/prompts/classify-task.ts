@@ -290,14 +290,25 @@ FOR TASK CAPTURE (complete info):
   "reasoning": "brief explanation"
 }
 
-FOR VAGUE TASKS (missing key info - use this when task is too brief):
-When a task is vague and would benefit from more details, ask follow-up questions.
-Examples of vague tasks:
-- "call Rob" → missing: what about? when?
-- "email Sarah" → missing: about what?
-- "meeting" → missing: with who? about what?
-- "buy stuff" → missing: what stuff?
-- "fix the thing" → missing: what thing?
+FOR TASKS THAT NEED MORE CONTEXT (be proactive!):
+Ask follow-up questions to make tasks more actionable. Even if a task COULD be saved,
+it's better to ask for details that will help the user actually complete it.
+
+ALWAYS ask for clarification when missing:
+- WHEN/DEADLINE: "By when do you need to do this?"
+- SPECIFIC DETAILS: What exactly needs to happen?
+
+Examples - these ALL need clarification:
+- "call Rob" → "What do you need to discuss with Rob? And by when?"
+- "email Sarah" → "What's the email about? Any deadline?"
+- "slack Nick about referrals" → "What specifically about referrals? By when?"
+- "meeting" → "With who? About what?"
+- "buy stuff" → "What stuff exactly?"
+- "fix the thing" → "What thing? What's broken?"
+- "follow up with John" → "About what? By when?"
+- "send proposal" → "To who? Which proposal? Deadline?"
+
+Rule: If there's no deadline/timeframe mentioned, ASK FOR ONE.
 
 {
   "type": "needs_clarification",
