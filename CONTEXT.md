@@ -272,6 +272,7 @@ Both Dockerfiles need the scheduler's package.json in the deps stage for the mon
 - [x] Auto-create people when user provides info about unknown person
 - [x] Professional WAITING task titles (e.g., "Person to deliver X")
 - [x] Context guidance in prompt (calls for quick phone tasks, computer for dense work)
+- [x] Required context/priority with smart defaults (no null values)
 
 ### Classifier Modes
 The classifier has two modes (passed as 5th parameter):
@@ -356,4 +357,4 @@ railway logs
 
 ---
 
-*Last updated: January 17, 2026 (session 2 - extraction mode fix)*
+*Last updated: January 17, 2026 (session 2 - extraction mode fix, required context/priority)*
