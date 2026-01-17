@@ -3,7 +3,7 @@ import type { ClassifyJobData, MessageJobData } from '@clarity/queue';
 import { enqueueNotionSync, enqueueOutboundMessage } from '@clarity/queue';
 import type { Queue } from 'bullmq';
 import type { DbClient } from '@clarity/database';
-import { users, messages, tasks, people } from '@clarity/database';
+import { users, messages, tasks, people, conversationStates } from '@clarity/database';
 import { eq } from 'drizzle-orm';
 import { createClassifier, findBestFuzzyMatch, formatDidYouMean } from '@clarity/ai';
 import {
@@ -65,6 +65,34 @@ export function createClassifyProcessor(
 
     if (!user) {
       throw new Error(`User not found: ${userId}`);
+    }
+
+    // 1b. Check for pending clarification state
+    const pendingClarification = await db.query.conversationStates.findFirst({
+      where: eq(conversationStates.userId, userId),
+    });
+
+    if (pendingClarification?.stateType === 'task_clarification') {
+      // User is responding to a clarification question
+      const response = await handleClarificationResponse(
+        db,
+        messageQueue,
+        user,
+        pendingClarification,
+        content
+      );
+
+      // Delete the clarification state
+      await db.delete(conversationStates).where(eq(conversationStates.id, pendingClarification.id));
+
+      await enqueueOutboundMessage(messageQueue, {
+        userId,
+        toNumber: user.phoneNumber,
+        content: response,
+        inReplyTo: messageId,
+      });
+
+      return { success: true, type: 'clarification_response' };
     }
 
     // 2. Check if it's a command
@@ -184,6 +212,27 @@ export function createClassifyProcessor(
         user,
         db
       );
+    } else if (classification.type === 'needs_clarification' && classification.followUpQuestion) {
+      // Task is vague - ask follow-up question
+      console.log(`[Classify] Needs clarification: ${classification.missingInfo?.join(', ')}`);
+
+      // Store partial task in conversation state for when user responds
+      const expiresAt = new Date();
+      expiresAt.setHours(expiresAt.getHours() + 1); // Expire after 1 hour
+
+      await db.insert(conversationStates).values({
+        userId,
+        stateType: 'task_clarification',
+        step: 'awaiting_response',
+        data: {
+          partialTask: classification.partialTask,
+          missingInfo: classification.missingInfo,
+          originalMessage: content,
+        },
+        expiresAt,
+      });
+
+      response = classification.followUpQuestion;
     } else if (classification.type === 'unknown' || classification.confidence < 0.5) {
       // Low confidence - ask for clarification
       response = formatClarification(classification);
@@ -771,4 +820,63 @@ async function createTaskFromClassification(
     matchedPerson?.name,
     pendingCount > 0 ? pendingCount : undefined
   );
+}
+
+/**
+ * Handle clarification response from user
+ * Merges the new info with the partial task and creates the complete task
+ */
+async function handleClarificationResponse(
+  db: DbClient,
+  messageQueue: Queue<MessageJobData>,
+  user: any,
+  state: any,
+  clarificationText: string
+): Promise<string> {
+  const data = state.data as {
+    partialTask?: { type: string; title: string };
+    missingInfo?: string[];
+    originalMessage?: string;
+  };
+
+  // Merge the original task with clarification
+  const originalTitle = data.partialTask?.title || data.originalMessage || '';
+  const taskType = data.partialTask?.type || 'action';
+
+  // Create enhanced task title combining original + clarification
+  const enhancedTitle = `${originalTitle} - ${clarificationText}`;
+
+  // Create the task
+  const [task] = await db
+    .insert(tasks)
+    .values({
+      userId: user.id,
+      rawText: `${data.originalMessage} (clarified: ${clarificationText})`,
+      title: enhancedTitle,
+      type: taskType as any,
+      status: 'pending',
+    })
+    .returning();
+
+  // Increment user's captured count
+  await db
+    .update(users)
+    .set({
+      totalTasksCaptured: (user.totalTasksCaptured ?? 0) + 1,
+      updatedAt: new Date(),
+    })
+    .where(eq(users.id, user.id));
+
+  // Queue for Notion sync
+  await enqueueNotionSync(messageQueue, {
+    userId: user.id,
+    taskId: task!.id,
+    classification: {
+      type: taskType as any,
+      title: enhancedTitle,
+      confidence: 1.0,
+    },
+  });
+
+  return formatTaskCapture(enhancedTitle, taskType as any);
 }

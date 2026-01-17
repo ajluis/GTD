@@ -73,8 +73,40 @@ export class GTDClassifier {
       return this.normalizeIntentResult(raw, originalMessage);
     }
 
+    // Check if this needs clarification
+    if (raw.type === 'needs_clarification' && raw.followUpQuestion) {
+      return this.normalizeClarificationResult(raw, originalMessage);
+    }
+
     // Otherwise, it's a task capture or unknown
     return this.normalizeTaskResult(raw, originalMessage);
+  }
+
+  /**
+   * Normalize a needs_clarification result
+   */
+  private normalizeClarificationResult(
+    raw: RawClassificationResult,
+    originalMessage: string
+  ): ClassificationResult {
+    const confidence = typeof raw.confidence === 'number'
+      ? Math.max(0, Math.min(1, raw.confidence))
+      : 0.8;
+
+    return {
+      type: 'needs_clarification',
+      confidence,
+      reasoning: raw.reasoning,
+      partialTask: raw.partialTask ? {
+        type: raw.partialTask.type as any || 'action',
+        title: raw.partialTask.title || originalMessage,
+      } : {
+        type: 'action',
+        title: originalMessage,
+      },
+      missingInfo: Array.isArray(raw.missingInfo) ? raw.missingInfo : [],
+      followUpQuestion: raw.followUpQuestion || "Can you tell me more about this task?",
+    };
   }
 
   /**
@@ -250,6 +282,13 @@ interface RawClassificationResult {
   dueDate?: string;
   confidence?: number;
   reasoning?: string;
+  // Clarification fields
+  partialTask?: {
+    type?: string;
+    title?: string;
+  };
+  missingInfo?: string[];
+  followUpQuestion?: string;
 }
 
 /**

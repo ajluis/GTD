@@ -40,8 +40,8 @@ export type MessageStatus = 'pending' | 'sent' | 'delivered' | 'failed' | 'recei
  * 3. Unknown (low confidence, needs clarification)
  */
 export interface ClassificationResult {
-  /** Classified type: task type, 'intent', or 'unknown' */
-  type: TaskType | 'intent' | 'command' | 'unknown';
+  /** Classified type: task type, 'intent', 'needs_clarification', or 'unknown' */
+  type: TaskType | 'intent' | 'command' | 'needs_clarification' | 'unknown';
 
   /** Detected command (legacy - for backwards compatibility) */
   command?: string;
@@ -73,6 +73,18 @@ export interface ClassificationResult {
 
   /** AI reasoning for classification */
   reasoning?: string;
+
+  /** Partial task info when clarification is needed */
+  partialTask?: {
+    type: TaskType;
+    title: string;
+  };
+
+  /** What information is missing */
+  missingInfo?: string[];
+
+  /** Natural language follow-up question to ask */
+  followUpQuestion?: string;
 }
 
 /**

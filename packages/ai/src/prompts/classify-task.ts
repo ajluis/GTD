@@ -225,7 +225,7 @@ FOR INTENTS:
   "confidence": 0.0-1.0
 }
 
-FOR TASK CAPTURE:
+FOR TASK CAPTURE (complete info):
 {
   "type": "action" | "project" | "agenda" | "waiting" | "someday",
   "title": "cleaned task title",
@@ -241,7 +241,28 @@ FOR TASK CAPTURE:
   "reasoning": "brief explanation"
 }
 
-FOR UNCLEAR:
+FOR VAGUE TASKS (missing key info - use this when task is too brief):
+When a task is vague and would benefit from more details, ask follow-up questions.
+Examples of vague tasks:
+- "call Rob" → missing: what about? when?
+- "email Sarah" → missing: about what?
+- "meeting" → missing: with who? about what?
+- "buy stuff" → missing: what stuff?
+- "fix the thing" → missing: what thing?
+
+{
+  "type": "needs_clarification",
+  "partialTask": {
+    "type": "action" | "agenda" | etc,
+    "title": "partial task title"
+  },
+  "missingInfo": ["topic", "deadline", "person", etc],
+  "followUpQuestion": "Natural question to ask (e.g., 'What do you need to discuss with Rob? And by when?')",
+  "confidence": 0.7-0.9,
+  "reasoning": "why clarification helps"
+}
+
+FOR UNCLEAR (can't understand at all):
 {
   "type": "unknown",
   "confidence": 0.0-0.5,
