@@ -324,6 +324,8 @@ const VALID_INTENTS: IntentType[] = [
   'set_digest_time',
   'set_timezone',
   'set_reminder_hours',
+  'set_review_day',
+  'set_review_time',
   'pause_account',
   'resume_account',
   'show_settings',
@@ -342,9 +344,11 @@ const VALID_INTENTS: IntentType[] = [
   // Bulk
   'clear_person_agenda',
   'complete_all_today',
+  'complete_all_context',
   // Info
   'show_stats',
   'show_help',
+  'show_weekly_review',
 ];
 
 /**
