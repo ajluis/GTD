@@ -29,6 +29,7 @@ COPY packages/gtd/package.json ./packages/gtd/
 COPY packages/todoist/package.json ./packages/todoist/
 COPY apps/api/package.json ./apps/api/
 COPY apps/worker/package.json ./apps/worker/
+COPY apps/scheduler/package.json ./apps/scheduler/
 
 # Install all dependencies
 RUN pnpm install --frozen-lockfile
