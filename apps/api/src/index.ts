@@ -73,13 +73,20 @@ async function main() {
     { prefix: '/webhooks/sendblue' }
   );
 
-  await fastify.register(
-    createNotionOAuthRoutes({
-      db,
-      appUrl: config.appUrl,
-    }),
-    { prefix: '/oauth/notion' }
-  );
+  // Only register Notion OAuth routes if OAuth credentials are configured
+  // (Skip for internal integration mode)
+  if (process.env['NOTION_CLIENT_ID'] && process.env['NOTION_CLIENT_SECRET']) {
+    await fastify.register(
+      createNotionOAuthRoutes({
+        db,
+        appUrl: config.appUrl,
+      }),
+      { prefix: '/oauth/notion' }
+    );
+    fastify.log.info('Notion OAuth routes registered');
+  } else {
+    fastify.log.info('Notion OAuth routes skipped (using internal integration mode)');
+  }
 
   // Graceful shutdown
   const shutdown = async () => {
