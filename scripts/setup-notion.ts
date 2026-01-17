@@ -26,19 +26,7 @@ const TASKS_DATABASE_PROPERTIES = {
     },
   },
   Status: {
-    status: {
-      options: [
-        { name: 'To Do', color: 'default' },
-        { name: 'In Progress', color: 'blue' },
-        { name: 'Done', color: 'green' },
-        { name: 'Discussed', color: 'purple' },
-      ],
-      groups: [
-        { name: 'To-do', option_ids: [], color: 'gray' },
-        { name: 'In progress', option_ids: [], color: 'blue' },
-        { name: 'Complete', option_ids: [], color: 'green' },
-      ],
-    },
+    status: {},  // Status property is created with default options by Notion
   },
   Context: {
     select: {
