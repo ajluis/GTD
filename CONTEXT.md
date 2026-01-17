@@ -51,12 +51,14 @@ Creates task in PostgreSQL → Syncs to Notion → Sends confirmation SMS back
 ## Key Files
 
 ### AI Classification
+> **Note:** These 4 files work together. When changing the classifier interface, update ALL of them:
+- `packages/ai/src/index.ts` - Package exports (must export new types)
 - `packages/ai/src/classifier.ts` - Main GTD classifier using Gemini
-- `packages/ai/src/prompts/classify-task.ts` - LLM prompt with intent detection
+- `packages/ai/src/prompts/classify-task.ts` - LLM prompt with intent detection + types
 - `packages/ai/src/fuzzy-match.ts` - Levenshtein distance for name matching
 
 ### Message Processing
-- `apps/worker/src/processors/classify.ts` - Main message processor
+- `apps/worker/src/processors/classify.ts` - Main message processor (fetches conversation history)
 - `apps/worker/src/handlers/intents.ts` - Intent router (35+ intent types)
 - `apps/worker/src/handlers/queries.ts` - Query handlers (today, actions, etc.)
 - `apps/worker/src/handlers/settings.ts` - Settings handlers (timezone, digest)
@@ -72,6 +74,7 @@ Creates task in PostgreSQL → Syncs to Notion → Sends confirmation SMS back
 - `packages/database/src/schema/users.ts` - User accounts + Notion credentials
 - `packages/database/src/schema/tasks.ts` - Local task records
 - `packages/database/src/schema/people.ts` - People for agenda items
+- `packages/database/src/schema/messages.ts` - SMS history (used for conversation context)
 - `packages/database/src/schema/conversation-states.ts` - Multi-turn conversation state
 
 ## Database Schema
