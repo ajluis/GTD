@@ -159,8 +159,150 @@ async function handleCommand(
       return "💭 SOMEDAY:\n• (Coming soon - Notion queries)\n\nText 'help' for commands.";
 
     case 'meetings':
-    case 'people':
-      return "👥 PEOPLE:\n• (Coming soon - Notion queries)\n\nText 'help' for commands.";
+    case 'people': {
+      // List all people with pending agenda counts
+      const userPeople = await db.query.people.findMany({
+        where: eq(people.userId, user.id),
+      });
+
+      if (userPeople.length === 0) {
+        return "👥 PEOPLE:\nNo people added yet.\n\nText 'add person [name]' to add someone.";
+      }
+
+      const lines = await Promise.all(
+        userPeople.map(async (p) => {
+          const agendaItems = await db.query.tasks.findMany({
+            where: eq(tasks.personId, p.id),
+          });
+          const pendingCount = agendaItems.filter((t) => t.status !== 'completed' && t.status !== 'synced').length;
+          const schedule = p.frequency && p.dayOfWeek
+            ? ` (${p.frequency} on ${p.dayOfWeek})`
+            : p.frequency
+              ? ` (${p.frequency})`
+              : '';
+          return `• ${p.name}${schedule}${pendingCount > 0 ? ` - ${pendingCount} pending` : ''}`;
+        })
+      );
+
+      return `👥 PEOPLE:\n${lines.join('\n')}`;
+    }
+
+    case 'add_person': {
+      const name = args[0];
+      if (!name) {
+        return "Please specify a name: 'add person [name]'";
+      }
+
+      // Check if person already exists
+      const existing = await db.query.people.findFirst({
+        where: eq(people.userId, user.id),
+      });
+
+      const allPeople = await db.query.people.findMany({
+        where: eq(people.userId, user.id),
+      });
+
+      const alreadyExists = allPeople.find(
+        (p) => p.name.toLowerCase() === name.toLowerCase()
+      );
+
+      if (alreadyExists) {
+        return `👤 ${name} already exists in your people list.`;
+      }
+
+      await db.insert(people).values({
+        userId: user.id,
+        name,
+        active: true,
+      });
+
+      return `✅ Added ${name} to your people.\n\nOptional next steps:\n• 'alias ${name} = nickname1, nickname2'\n• '${name} meets weekly on Tuesday'`;
+    }
+
+    case 'remove_person': {
+      const name = args[0];
+      if (!name) {
+        return "Please specify a name: 'remove person [name]'";
+      }
+
+      const allPeople = await db.query.people.findMany({
+        where: eq(people.userId, user.id),
+      });
+
+      const person = allPeople.find(
+        (p) => p.name.toLowerCase() === name.toLowerCase()
+      );
+
+      if (!person) {
+        return `👤 ${name} not found in your people list.`;
+      }
+
+      await db.delete(people).where(eq(people.id, person.id));
+
+      return `✅ Removed ${name} from your people.`;
+    }
+
+    case 'set_alias': {
+      const [name, aliasesStr] = args;
+      if (!name || !aliasesStr) {
+        return "Format: 'alias [name] = alias1, alias2, alias3'";
+      }
+
+      const allPeople = await db.query.people.findMany({
+        where: eq(people.userId, user.id),
+      });
+
+      const person = allPeople.find(
+        (p) => p.name.toLowerCase() === name.toLowerCase()
+      );
+
+      if (!person) {
+        return `👤 ${name} not found. Add them first with 'add person ${name}'`;
+      }
+
+      const aliases = aliasesStr.split(',').map((a) => a.trim().toLowerCase());
+
+      await db
+        .update(people)
+        .set({ aliases, updatedAt: new Date() })
+        .where(eq(people.id, person.id));
+
+      return `✅ Set aliases for ${person.name}: ${aliases.join(', ')}`;
+    }
+
+    case 'set_schedule': {
+      const [name, frequency, dayOfWeek] = args;
+      if (!name || !frequency) {
+        return "Format: '[name] meets weekly on Tuesday'";
+      }
+
+      const allPeople = await db.query.people.findMany({
+        where: eq(people.userId, user.id),
+      });
+
+      const person = allPeople.find(
+        (p) => p.name.toLowerCase() === name.toLowerCase()
+      );
+
+      if (!person) {
+        return `👤 ${name} not found. Add them first with 'add person ${name}'`;
+      }
+
+      await db
+        .update(people)
+        .set({
+          frequency: frequency as any,
+          dayOfWeek: dayOfWeek as any || null,
+          updatedAt: new Date(),
+        })
+        .where(eq(people.id, person.id));
+
+      const scheduleStr = dayOfWeek
+        ? `${frequency} on ${dayOfWeek}`
+        : frequency;
+
+      return `✅ ${person.name} now meets ${scheduleStr}`;
+    }
 
     case 'context':
       const ctx = args[0];

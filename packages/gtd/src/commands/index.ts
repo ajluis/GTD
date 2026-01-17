@@ -54,10 +54,15 @@ export function isCommand(message: string): boolean {
   }
 
   // Starts with command + space (for commands with args like "done task")
-  for (const cmd of ['done', 'done with']) {
+  for (const cmd of ['done', 'done with', 'add person', 'remove person', 'alias']) {
     if (normalized.startsWith(cmd + ' ') || normalized === cmd) {
       return true;
     }
+  }
+
+  // Check for "[name] meets [frequency] on [day]" pattern
+  if (/^.+\s+meets\s+(daily|weekly|biweekly|monthly)/i.test(normalized)) {
+    return true;
   }
 
   return false;
@@ -85,6 +90,45 @@ export function parseCommand(message: string): { command: string; args: string[]
     return {
       command: 'done',
       args: [message.slice('done '.length).trim()],
+    };
+  }
+
+  // Handle "add person [name]"
+  if (normalized.startsWith('add person ')) {
+    return {
+      command: 'add_person',
+      args: [message.slice('add person '.length).trim()],
+    };
+  }
+
+  // Handle "remove person [name]"
+  if (normalized.startsWith('remove person ')) {
+    return {
+      command: 'remove_person',
+      args: [message.slice('remove person '.length).trim()],
+    };
+  }
+
+  // Handle "alias [name] = [aliases]"
+  if (normalized.startsWith('alias ')) {
+    const rest = message.slice('alias '.length).trim();
+    const eqIndex = rest.indexOf('=');
+    if (eqIndex > 0) {
+      const name = rest.slice(0, eqIndex).trim();
+      const aliases = rest.slice(eqIndex + 1).trim();
+      return {
+        command: 'set_alias',
+        args: [name, aliases],
+      };
+    }
+  }
+
+  // Handle "[name] meets [frequency] on [day]" pattern
+  const meetsMatch = message.match(/^(.+?)\s+meets\s+(daily|weekly|biweekly|monthly)(?:\s+on\s+(\w+))?/i);
+  if (meetsMatch && meetsMatch[1] && meetsMatch[2]) {
+    return {
+      command: 'set_schedule',
+      args: [meetsMatch[1].trim(), meetsMatch[2].toLowerCase(), meetsMatch[3]?.toLowerCase() ?? ''],
     };
   }
 
