@@ -226,7 +226,14 @@ For intents, extract these entities when present:
     - "send at 7am please" → "7am"
   * For hours: Extract just the number (e.g., "2", "3")
     - "remind me 3 hours before" → "3"
-- context: work, home, errands, calls, computer, anywhere
+- context: Assign based on WHERE/HOW the task can be done:
+  * "calls" - Quick tasks doable from phone (slack, email, text, quick calls)
+    → Can be done while in car, waiting rooms, etc.
+  * "computer" - Dense work requiring full keyboard/screen (writing, coding, research, spreadsheets)
+  * "errands" - Physical tasks outside (shopping, pickup, dropoff, appointments)
+  * "home" - Tasks that can only be done at home (chores, home repairs)
+  * "work" - Tasks requiring being at work location (meetings, office equipment)
+  * "anywhere" - Truly location-independent tasks
 - priority: today, this_week, soon
 - dueDate: Parse to ISO format (YYYY-MM-DD)
 - taskType: action, project, waiting, someday, agenda
