@@ -161,7 +161,15 @@ export function createSendblueWebhook(config: SendblueWebhookConfig): FastifyPlu
             messageId: payload.message_handle,
           });
         } catch (error) {
-          fastify.log.error({ error }, 'Failed to enqueue message');
+          const err = error as Error;
+          fastify.log.error(
+            {
+              errorMessage: err.message,
+              errorStack: err.stack,
+              errorName: err.name,
+            },
+            'Failed to enqueue message'
+          );
 
           // Still return 200 to prevent Sendblue retries
           // Message will be lost, but we log it for debugging
