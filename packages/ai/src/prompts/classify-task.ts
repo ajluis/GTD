@@ -1,6 +1,18 @@
 import type { PersonForMatching } from '@clarity/shared-types';
 
 /**
+ * Conversation message for context
+ */
+export interface ConversationMessage {
+  /** 'user' for inbound messages, 'assistant' for outbound responses */
+  role: 'user' | 'assistant';
+  /** Message content */
+  content: string;
+  /** When the message was sent */
+  timestamp: Date;
+}
+
+/**
  * Build the GTD classification prompt for Gemini
  *
  * This prompt instructs Gemini to:
@@ -11,7 +23,8 @@ import type { PersonForMatching } from '@clarity/shared-types';
 export function buildClassificationPrompt(
   message: string,
   people: PersonForMatching[],
-  currentTime: Date
+  currentTime: Date,
+  conversationHistory: ConversationMessage[] = []
 ): string {
   const peopleList =
     people.length > 0
@@ -36,6 +49,14 @@ export function buildClassificationPrompt(
     hour12: true,
   });
 
+  // Format conversation history (most recent last, limit to last 6 messages)
+  const recentHistory = conversationHistory.slice(-6);
+  const conversationContext = recentHistory.length > 0
+    ? recentHistory
+        .map((msg) => `[${msg.role === 'user' ? 'USER' : 'CLARITY'}]: ${msg.content}`)
+        .join('\n')
+    : '(No recent conversation)';
+
   return `You are Clarity, a GTD (Getting Things Done) assistant that helps users via SMS.
 
 CURRENT CONTEXT:
@@ -44,6 +65,9 @@ CURRENT CONTEXT:
 
 USER'S PEOPLE LIST:
 ${peopleList}
+
+RECENT CONVERSATION (use for context when user says "that", "it", "the first one", etc.):
+${conversationContext}
 
 ═══════════════════════════════════════════════════════════════
 CLASSIFICATION RULES - Follow this decision tree:
@@ -78,6 +102,14 @@ INTENT DETECTION (check FIRST)
    │ "that's done", "done", "finished" (no task specified) → complete_recent
    │ "done with [person]", "finished meeting with [person]" → complete_person_agenda
    │ "all caught up with [person]", "met with [person]" → complete_person_agenda
+   │
+   │ IMPORTANT: Use RECENT CONVERSATION to resolve "that", "it", "the first one":
+   │ - If user just saw a task list and says "done" or "finished that" →
+   │   Look at what CLARITY showed them and extract the task name!
+   │ - Example: CLARITY showed "🔥 TODAY: • Call Rob" then USER says "finished that"
+   │   → This is complete_task with taskText: "Call Rob" (NOT complete_recent!)
+   │ - If multiple tasks were shown and user says "the second one" →
+   │   Extract the second task from the list
    └─────────────────────────────────────────────────────────────
 
 3. PEOPLE MANAGEMENT INTENTS - User wants to MANAGE people
