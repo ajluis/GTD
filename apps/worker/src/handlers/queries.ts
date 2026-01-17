@@ -9,6 +9,8 @@ import {
   querySomedayTasks,
   queryTasksByContext,
   queryAgendaForPerson,
+  queryCompletedTasksInRange,
+  queryTasksDueInRange,
   extractTaskTitle,
   extractTaskDueDate,
 } from '@gtd/notion';
@@ -262,5 +264,132 @@ export async function handleQueryPersonAgenda(
   } catch (error) {
     console.error('[Query:person_agenda] Error:', error);
     return `👤 ${person.name}\n\nCouldn't fetch agenda items. Try again later.`;
+  }
+}
+
+/**
+ * Handle show_weekly_review intent
+ * "review", "weekly review", "show me my review"
+ */
+export async function handleShowWeeklyReview(ctx: HandlerContext): Promise<string> {
+  if (!ctx.user.notionAccessToken || !ctx.user.notionTasksDatabaseId) {
+    return "📋 WEEKLY REVIEW:\nConnect Notion first to see your review.";
+  }
+
+  try {
+    const notion = createNotionClient(ctx.user.notionAccessToken);
+
+    // Get week bounds
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0]!;
+
+    // Week start (7 days ago)
+    const weekStart = new Date(today);
+    weekStart.setDate(today.getDate() - 7);
+    const weekStartStr = weekStart.toISOString().split('T')[0]!;
+
+    // Next week end (7 days from now)
+    const nextWeekEnd = new Date(today);
+    nextWeekEnd.setDate(today.getDate() + 7);
+    const nextWeekEndStr = nextWeekEnd.toISOString().split('T')[0]!;
+
+    const [completedTasks, upcomingTasks, projects, waitingTasks, somedayTasks] = await Promise.all([
+      queryCompletedTasksInRange(notion, ctx.user.notionTasksDatabaseId, weekStartStr, todayStr),
+      queryTasksDueInRange(notion, ctx.user.notionTasksDatabaseId, todayStr, nextWeekEndStr),
+      queryActiveProjects(notion, ctx.user.notionTasksDatabaseId),
+      queryWaitingTasks(notion, ctx.user.notionTasksDatabaseId),
+      querySomedayTasks(notion, ctx.user.notionTasksDatabaseId),
+    ]);
+
+    // Count overdue waiting tasks
+    const overdueWaiting = waitingTasks.filter((task) => {
+      const dueDate = extractTaskDueDate(task);
+      return dueDate && dueDate < todayStr;
+    });
+
+    const lines: string[] = ['📋 WEEKLY REVIEW'];
+    lines.push('');
+
+    // WINS - Completed this week
+    lines.push('🎯 COMPLETED THIS WEEK:');
+    if (completedTasks.length > 0) {
+      for (const task of completedTasks.slice(0, 5)) {
+        lines.push(`  ✓ ${extractTaskTitle(task)}`);
+      }
+      if (completedTasks.length > 5) {
+        lines.push(`  (+${completedTasks.length - 5} more)`);
+      }
+    } else {
+      lines.push('  (none)');
+    }
+    lines.push('');
+
+    // PROJECTS
+    lines.push(`📁 ACTIVE PROJECTS (${projects.length}):`);
+    if (projects.length > 0) {
+      for (const project of projects.slice(0, 3)) {
+        lines.push(`  • ${extractTaskTitle(project)}`);
+      }
+      if (projects.length > 3) {
+        lines.push(`  (+${projects.length - 3} more)`);
+      }
+    } else {
+      lines.push('  (none)');
+    }
+    lines.push('');
+
+    // WAITING
+    const waitingHeader = overdueWaiting.length > 0
+      ? `⏳ WAITING (${waitingTasks.length}, ${overdueWaiting.length} overdue!):`
+      : `⏳ WAITING (${waitingTasks.length}):`;
+    lines.push(waitingHeader);
+    if (waitingTasks.length > 0) {
+      for (const task of waitingTasks.slice(0, 3)) {
+        const dueDate = extractTaskDueDate(task);
+        const isOverdue = dueDate && dueDate < todayStr;
+        const suffix = isOverdue ? ' ⚠️' : '';
+        lines.push(`  • ${extractTaskTitle(task)}${suffix}`);
+      }
+      if (waitingTasks.length > 3) {
+        lines.push(`  (+${waitingTasks.length - 3} more)`);
+      }
+    } else {
+      lines.push('  (none)');
+    }
+    lines.push('');
+
+    // SOMEDAY
+    lines.push(`💭 SOMEDAY (${somedayTasks.length}):`);
+    if (somedayTasks.length > 0) {
+      for (const task of somedayTasks.slice(0, 2)) {
+        lines.push(`  • ${extractTaskTitle(task)}`);
+      }
+      if (somedayTasks.length > 2) {
+        lines.push(`  (+${somedayTasks.length - 2} more)`);
+      }
+    } else {
+      lines.push('  (none)');
+    }
+    lines.push('');
+
+    // UPCOMING
+    lines.push(`📅 DUE NEXT 7 DAYS (${upcomingTasks.length}):`);
+    if (upcomingTasks.length > 0) {
+      for (const task of upcomingTasks.slice(0, 3)) {
+        const dueDate = extractTaskDueDate(task);
+        const dateSuffix = dueDate ? ` (${dueDate})` : '';
+        lines.push(`  • ${extractTaskTitle(task)}${dateSuffix}`);
+      }
+      if (upcomingTasks.length > 3) {
+        lines.push(`  (+${upcomingTasks.length - 3} more)`);
+      }
+    } else {
+      lines.push('  (none)');
+    }
+
+    return lines.join('\n');
+  } catch (error) {
+    console.error('[Query:weekly_review] Error:', error);
+    return "📋 WEEKLY REVIEW:\nCouldn't fetch data. Try again later.";
   }
 }

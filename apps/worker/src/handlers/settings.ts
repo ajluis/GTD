@@ -269,12 +269,15 @@ export async function handleResumeAccount(ctx: HandlerContext): Promise<string> 
  */
 export async function handleShowSettings(ctx: HandlerContext): Promise<string> {
   const digestTime = formatTime(ctx.user.digestTime);
+  const reviewTime = formatTime(ctx.user.weeklyReviewTime);
+  const reviewDay = ctx.user.weeklyReviewDay.charAt(0).toUpperCase() + ctx.user.weeklyReviewDay.slice(1);
 
   const lines = [
     '⚙️ SETTINGS:',
     '',
     `📍 Timezone: ${ctx.user.timezone}`,
     `☀️ Daily digest: ${digestTime}`,
+    `📋 Weekly review: ${reviewDay} at ${reviewTime}`,
     `🔔 Meeting reminder: ${ctx.user.meetingReminderHours}h before`,
     `📊 Status: ${ctx.user.status}`,
     '',
@@ -283,4 +286,56 @@ export async function handleShowSettings(ctx: HandlerContext): Promise<string> {
   ];
 
   return lines.join('\n');
+}
+
+/**
+ * Handle set_review_day intent
+ * "review on sundays", "weekly review on saturday"
+ */
+export async function handleSetReviewDay(
+  entities: IntentEntities,
+  ctx: HandlerContext
+): Promise<string> {
+  const dayValue = entities.dayOfWeek ?? entities.newValue?.toLowerCase().trim();
+
+  const validDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+
+  if (!dayValue || !validDays.includes(dayValue)) {
+    return "Which day? Try 'review on Sunday' or 'weekly review on Saturday'.";
+  }
+
+  await ctx.db
+    .update(users)
+    .set({ weeklyReviewDay: dayValue, updatedAt: new Date() })
+    .where(eq(users.id, ctx.user.id));
+
+  const displayDay = dayValue.charAt(0).toUpperCase() + dayValue.slice(1);
+  const reviewTime = formatTime(ctx.user.weeklyReviewTime);
+
+  return `✅ Weekly review moved to ${displayDay} at ${reviewTime}.`;
+}
+
+/**
+ * Handle set_review_time intent
+ * "review at 6pm", "weekly review at 5:30pm"
+ */
+export async function handleSetReviewTime(
+  entities: IntentEntities,
+  ctx: HandlerContext
+): Promise<string> {
+  const timeValue = entities.newValue;
+  const parsedTime = parseTimeString(timeValue);
+
+  if (!parsedTime) {
+    return "What time? Try '6pm', '5:30pm', or '18:00'";
+  }
+
+  await ctx.db
+    .update(users)
+    .set({ weeklyReviewTime: parsedTime, updatedAt: new Date() })
+    .where(eq(users.id, ctx.user.id));
+
+  const displayDay = ctx.user.weeklyReviewDay.charAt(0).toUpperCase() + ctx.user.weeklyReviewDay.slice(1);
+
+  return `✅ Weekly review will arrive ${displayDay} at ${formatTime(parsedTime)}.`;
 }

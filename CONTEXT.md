@@ -97,6 +97,8 @@ Creates task in PostgreSQL → Syncs to Notion → Sends confirmation SMS back
 - status (enum: 'onboarding', 'active', 'paused')
 - total_tasks_captured (int)
 - total_tasks_completed (int)
+- weekly_review_day (text, default: 'sunday')
+- weekly_review_time (text, default: '18:00')
 ```
 
 ### tasks
@@ -130,7 +132,7 @@ Creates task in PostgreSQL → Syncs to Notion → Sends confirmation SMS back
 ```sql
 - id (uuid, PK)
 - user_id (uuid, FK → users)
-- state_type (text) -- 'task_clarification', 'post_meeting', etc.
+- state_type (text) -- 'task_clarification', 'batch_confirmation', 'post_meeting', etc.
 - step (text)
 - data (jsonb) -- State-specific data
 - expires_at (timestamp)
@@ -293,11 +295,15 @@ Applied in `normalizeTaskResult()` even if LLM ignores prompt instructions.
 1. **Notion Status filter** - Uses `select` type, not native `status` type
 
 ### TODOs
-- [ ] Implement undo functionality (needs action history)
+- [x] Implement undo functionality (needs action history)
 - [ ] Implement `change_task_type` (needs last task tracking)
 - [ ] Add conversation state for post-meeting flow
-- [ ] Weekly review feature
 - [ ] Project health tracking
+
+### Recently Implemented
+- [x] Weekly review feature (scheduled SMS + interactive REVIEW command)
+- [x] Batch operations with confirmation flow (complete_all_today, complete_all_context, clear_person_agenda)
+- [x] Weekly review settings (set_review_day, set_review_time)
 
 ## Testing Locally
 
@@ -357,4 +363,4 @@ railway logs
 
 ---
 
-*Last updated: January 17, 2026 (session 2 - extraction mode fix, required context/priority)*
+*Last updated: January 17, 2026 (session 3 - weekly review feature, batch operations with confirmation)*

@@ -13,6 +13,7 @@ import {
   handleQueryContext,
   handleQueryPeople,
   handleQueryPersonAgenda,
+  handleShowWeeklyReview,
 } from './queries.js';
 import {
   handleCompleteTask,
@@ -32,6 +33,8 @@ import {
   handlePauseAccount,
   handleResumeAccount,
   handleShowSettings,
+  handleSetReviewDay,
+  handleSetReviewTime,
 } from './settings.js';
 import {
   handleRescheduleTask,
@@ -50,6 +53,7 @@ import {
 import {
   handleClearPersonAgenda,
   handleCompleteAllToday,
+  handleCompleteAllContext,
   handleShowStats,
   handleShowHelp,
 } from './bulk.js';
@@ -67,6 +71,8 @@ export interface HandlerContext {
     timezone: string;
     digestTime: string;
     meetingReminderHours: number;
+    weeklyReviewDay: string;
+    weeklyReviewTime: string;
     status: string;
     totalTasksCaptured: number;
     totalTasksCompleted: number;
@@ -130,6 +136,10 @@ export async function handleIntent(
         return handleSetTimezone(intent.entities, ctx);
       case 'set_reminder_hours':
         return handleSetReminderHours(intent.entities, ctx);
+      case 'set_review_day':
+        return handleSetReviewDay(intent.entities, ctx);
+      case 'set_review_time':
+        return handleSetReviewTime(intent.entities, ctx);
       case 'pause_account':
         return handlePauseAccount(ctx);
       case 'resume_account':
@@ -166,12 +176,16 @@ export async function handleIntent(
         return handleClearPersonAgenda(intent.entities, ctx);
       case 'complete_all_today':
         return handleCompleteAllToday(ctx);
+      case 'complete_all_context':
+        return handleCompleteAllContext(intent.entities, ctx);
 
       // Info
       case 'show_stats':
         return handleShowStats(ctx);
       case 'show_help':
         return handleShowHelp();
+      case 'show_weekly_review':
+        return handleShowWeeklyReview(ctx);
 
       default:
         console.warn(`[IntentHandler] Unknown intent: ${intent.intent}`);

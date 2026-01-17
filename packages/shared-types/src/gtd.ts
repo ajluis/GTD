@@ -96,13 +96,25 @@ export type ConversationStateType =
   | 'clarification'
   | 'post_meeting'
   | 'add_person'
-  | 'waiting_followup';
+  | 'waiting_followup'
+  | 'batch_confirmation';
 
 export interface ConversationState {
   type: ConversationStateType;
   step?: string;
   data?: Record<string, unknown>;
   expiresAt: number;
+}
+
+/**
+ * Data stored for batch operation confirmations
+ */
+export interface BatchConfirmationData {
+  operation: 'complete_all_today' | 'complete_all_context' | 'clear_person_agenda';
+  taskIds: string[];
+  taskTitles: string[];
+  context?: TaskContext;
+  personName?: string;
 }
 
 /**
@@ -178,9 +190,14 @@ export type IntentType =
   // Bulk operations
   | 'clear_person_agenda'
   | 'complete_all_today'
+  | 'complete_all_context'
   // Information
   | 'show_stats'
-  | 'show_help';
+  | 'show_help'
+  | 'show_weekly_review'
+  // Weekly review settings
+  | 'set_review_day'
+  | 'set_review_time';
 
 /**
  * Entities extracted from user message for intent handling

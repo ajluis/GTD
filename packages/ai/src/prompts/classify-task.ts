@@ -173,11 +173,22 @@ INTENT DETECTION (check FIRST)
    ┌─────────────────────────────────────────────────────────────
    │ "clear [person]'s agenda", "remove all items for [person]" → clear_person_agenda
    │ "mark everything today as done", "all done for today" → complete_all_today
+   │ "finished all @errands", "done with @computer tasks" → complete_all_context
+   │ "completed all @phone items", "cleared my @outside tasks" → complete_all_context
    └─────────────────────────────────────────────────────────────
 
-8. STATS INTENTS
+8. STATS & REVIEW INTENTS
    ┌─────────────────────────────────────────────────────────────
    │ "how am I doing", "my stats", "show statistics" → show_stats
+   │ "weekly review", "review", "show my review" → show_weekly_review
+   │
+   │ WEEKLY REVIEW SETTINGS - These are about WHEN the review SMS arrives:
+   │ "what time is weekly review", "when is my review" → show_settings
+   │ "when do I get my weekly review" → show_settings
+   │ "review on sunday", "change review day to saturday" → set_review_day
+   │ "move review to friday", "weekly review on monday" → set_review_day
+   │ "review at 6pm", "weekly review at 5:30pm" → set_review_time
+   │ "change review time to 7pm", "send review at 8am" → set_review_time
    └─────────────────────────────────────────────────────────────
 
 ═══════════════════════════════════════════════════════════════

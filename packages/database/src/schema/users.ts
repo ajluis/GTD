@@ -41,6 +41,10 @@ export const users = pgTable(
     digestTime: text('digest_time').default('08:00').notNull(),
     /** Hours before meeting to send reminder */
     meetingReminderHours: integer('meeting_reminder_hours').default(2).notNull(),
+    /** Day of week for weekly review (lowercase) */
+    weeklyReviewDay: text('weekly_review_day').default('sunday').notNull(),
+    /** Weekly review time in HH:MM format */
+    weeklyReviewTime: text('weekly_review_time').default('18:00').notNull(),
 
     // Status
     /** Current user status */

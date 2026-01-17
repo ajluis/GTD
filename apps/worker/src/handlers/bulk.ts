@@ -1,16 +1,25 @@
-import { people } from '@gtd/database';
+import { people, conversationStates } from '@gtd/database';
 import { eq } from 'drizzle-orm';
 import {
   createNotionClient,
   queryTasksDueToday,
+  queryTasksByContext,
   queryAgendaForPerson,
   completeTask,
   markDiscussed,
   extractTaskTitle,
 } from '@gtd/notion';
 import { formatHelp } from '@gtd/gtd';
-import type { IntentEntities } from '@gtd/shared-types';
+import type { IntentEntities, BatchConfirmationData, TaskContext } from '@gtd/shared-types';
 import type { HandlerContext } from './intents.js';
+
+// Map internal context names to Notion format
+const CONTEXT_TO_NOTION: Record<TaskContext, string> = {
+  computer: 'computer',
+  phone: 'phone',
+  home: 'home',
+  outside: 'outside',
+};
 
 /**
  * Handle clear_person_agenda intent
@@ -57,12 +66,37 @@ export async function handleClearPersonAgenda(
       return `${person.name} has no pending agenda items.`;
     }
 
-    // Mark all as discussed (soft clear)
-    for (const item of agendaItems) {
-      await markDiscussed(notion, item.id);
+    // Single item - clear immediately
+    if (agendaItems.length === 1) {
+      await markDiscussed(notion, agendaItems[0]!.id);
+      return `✅ Cleared 1 agenda item for ${person.name}.`;
     }
 
-    return `✅ Cleared ${agendaItems.length} agenda items for ${person.name}.`;
+    // Multiple items - ask for confirmation
+    const taskIds = agendaItems.map((t) => t.id);
+    const taskTitles = agendaItems.map((t) => extractTaskTitle(t));
+
+    // Store conversation state
+    const expiresAt = new Date();
+    expiresAt.setMinutes(expiresAt.getMinutes() + 5); // 5 minute expiry
+
+    await ctx.db.insert(conversationStates).values({
+      userId: ctx.user.id,
+      stateType: 'batch_confirmation',
+      step: 'awaiting_yes',
+      data: {
+        operation: 'clear_person_agenda',
+        taskIds,
+        taskTitles,
+        personName: person.name,
+      } satisfies BatchConfirmationData,
+      expiresAt,
+    });
+
+    const taskNames = taskTitles.slice(0, 3).map((t) => `• ${t}`);
+    const moreText = agendaItems.length > 3 ? `\n• (+${agendaItems.length - 3} more)` : '';
+
+    return `Clear ${agendaItems.length} agenda items for ${person.name}?\n${taskNames.join('\n')}${moreText}\n\nReply 'yes' to confirm.`;
   } catch (error) {
     console.error('[Bulk:clear_agenda] Error:', error);
     return "Couldn't clear agenda. Try again later.";
@@ -86,21 +120,107 @@ export async function handleCompleteAllToday(ctx: HandlerContext): Promise<strin
       return "No tasks due today to complete!";
     }
 
-    // Confirm before bulk complete
-    if (todayTasks.length > 1) {
-      const taskNames = todayTasks.slice(0, 3).map((t) => `• ${extractTaskTitle(t)}`);
-      const moreText = todayTasks.length > 3 ? `\n• (+${todayTasks.length - 3} more)` : '';
-
-      return `Are you sure? This will complete ${todayTasks.length} tasks:\n${taskNames.join('\n')}${moreText}\n\nReply 'yes' to confirm.`;
+    // Single task - complete immediately
+    if (todayTasks.length === 1) {
+      const task = todayTasks[0]!;
+      await completeTask(notion, task.id);
+      return `✅ "${extractTaskTitle(task)}" — done!`;
     }
 
-    // Single task - just complete it
-    const task = todayTasks[0]!;
-    await completeTask(notion, task.id);
+    // Multiple tasks - ask for confirmation
+    const taskIds = todayTasks.map((t) => t.id);
+    const taskTitles = todayTasks.map((t) => extractTaskTitle(t));
 
-    return `✅ "${extractTaskTitle(task)}" — done!`;
+    // Store conversation state
+    const expiresAt = new Date();
+    expiresAt.setMinutes(expiresAt.getMinutes() + 5); // 5 minute expiry
+
+    await ctx.db.insert(conversationStates).values({
+      userId: ctx.user.id,
+      stateType: 'batch_confirmation',
+      step: 'awaiting_yes',
+      data: {
+        operation: 'complete_all_today',
+        taskIds,
+        taskTitles,
+      } satisfies BatchConfirmationData,
+      expiresAt,
+    });
+
+    const taskNames = taskTitles.slice(0, 3).map((t) => `• ${t}`);
+    const moreText = todayTasks.length > 3 ? `\n• (+${todayTasks.length - 3} more)` : '';
+
+    return `Complete ${todayTasks.length} tasks due today?\n${taskNames.join('\n')}${moreText}\n\nReply 'yes' to confirm.`;
   } catch (error) {
-    console.error('[Bulk:complete_all] Error:', error);
+    console.error('[Bulk:complete_all_today] Error:', error);
+    return "Couldn't complete tasks. Try again later.";
+  }
+}
+
+/**
+ * Handle complete_all_context intent
+ * "finished all @errands", "done with @computer tasks"
+ */
+export async function handleCompleteAllContext(
+  entities: IntentEntities,
+  ctx: HandlerContext
+): Promise<string> {
+  const context = entities.context;
+
+  if (!context) {
+    return "Which context? Try 'done with @computer', 'finished all @errands', etc.";
+  }
+
+  if (!ctx.user.notionAccessToken || !ctx.user.notionTasksDatabaseId) {
+    return "Connect Notion first to complete tasks.";
+  }
+
+  try {
+    const notion = createNotionClient(ctx.user.notionAccessToken);
+    const contextTasks = await queryTasksByContext(
+      notion,
+      ctx.user.notionTasksDatabaseId,
+      CONTEXT_TO_NOTION[context]
+    );
+
+    if (contextTasks.length === 0) {
+      return `No @${context} tasks to complete!`;
+    }
+
+    // Single task - complete immediately
+    if (contextTasks.length === 1) {
+      const task = contextTasks[0]!;
+      await completeTask(notion, task.id);
+      return `✅ "${extractTaskTitle(task)}" — done!`;
+    }
+
+    // Multiple tasks - ask for confirmation
+    const taskIds = contextTasks.map((t) => t.id);
+    const taskTitles = contextTasks.map((t) => extractTaskTitle(t));
+
+    // Store conversation state
+    const expiresAt = new Date();
+    expiresAt.setMinutes(expiresAt.getMinutes() + 5); // 5 minute expiry
+
+    await ctx.db.insert(conversationStates).values({
+      userId: ctx.user.id,
+      stateType: 'batch_confirmation',
+      step: 'awaiting_yes',
+      data: {
+        operation: 'complete_all_context',
+        taskIds,
+        taskTitles,
+        context,
+      } satisfies BatchConfirmationData,
+      expiresAt,
+    });
+
+    const taskNames = taskTitles.slice(0, 3).map((t) => `• ${t}`);
+    const moreText = contextTasks.length > 3 ? `\n• (+${contextTasks.length - 3} more)` : '';
+
+    return `Complete ${contextTasks.length} @${context} tasks?\n${taskNames.join('\n')}${moreText}\n\nReply 'yes' to confirm.`;
+  } catch (error) {
+    console.error('[Bulk:complete_all_context] Error:', error);
     return "Couldn't complete tasks. Try again later.";
   }
 }

@@ -5,6 +5,7 @@ import { createMessageQueue, createWorkerConnection } from '@gtd/queue';
 import { runDailyDigest } from './jobs/daily-digest.js';
 import { runMeetingReminders } from './jobs/meeting-reminder.js';
 import { runWaitingFollowups } from './jobs/waiting-followup.js';
+import { runWeeklyReview } from './jobs/weekly-review.js';
 
 /**
  * GTD Scheduler
@@ -70,6 +71,16 @@ async function main() {
     }
   });
   console.log('[Scheduler] Waiting follow-up job scheduled (daily at 10 AM UTC)');
+
+  // Weekly Review - runs every minute, checks user's review day + time
+  cron.schedule('* * * * *', async () => {
+    try {
+      await runWeeklyReview(db, messageQueue);
+    } catch (error) {
+      console.error('[Scheduler:WeeklyReview] Error:', error);
+    }
+  });
+  console.log('[Scheduler] Weekly review job scheduled (checks every minute)');
 
   console.log('[Scheduler] All jobs scheduled. Scheduler running...');
 

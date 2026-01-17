@@ -33,8 +33,9 @@ import {
   formatTaskList,
   formatTaskComplete,
 } from '@gtd/gtd';
-import type { PersonForMatching, ClassificationResult } from '@gtd/shared-types';
+import type { PersonForMatching, ClassificationResult, BatchConfirmationData } from '@gtd/shared-types';
 import { handleIntent, type HandlerContext } from '../handlers/intents.js';
+import { markDiscussed } from '@gtd/notion';
 
 /**
  * Classification Processor
@@ -93,6 +94,28 @@ export function createClassifyProcessor(
       });
 
       return { success: true, type: 'clarification_response' };
+    }
+
+    // 1c. Check for pending batch confirmation state
+    if (pendingClarification?.stateType === 'batch_confirmation') {
+      const response = await handleBatchConfirmationResponse(
+        db,
+        user,
+        pendingClarification,
+        content
+      );
+
+      // Delete the confirmation state
+      await db.delete(conversationStates).where(eq(conversationStates.id, pendingClarification.id));
+
+      await enqueueOutboundMessage(messageQueue, {
+        userId,
+        toNumber: user.phoneNumber,
+        content: response,
+        inReplyTo: messageId,
+      });
+
+      return { success: true, type: 'batch_confirmation_response' };
     }
 
     // 2. Check if it's a command
@@ -215,6 +238,8 @@ export function createClassifyProcessor(
           timezone: user.timezone,
           digestTime: user.digestTime,
           meetingReminderHours: user.meetingReminderHours,
+          weeklyReviewDay: user.weeklyReviewDay,
+          weeklyReviewTime: user.weeklyReviewTime,
           status: user.status,
           totalTasksCaptured: user.totalTasksCaptured,
           totalTasksCompleted: user.totalTasksCompleted,
@@ -1038,4 +1063,69 @@ async function handleClarificationResponse(
     classification.dueDate,
     displayPersonName
   );
+}
+
+/**
+ * Handle batch confirmation response (yes/no)
+ */
+async function handleBatchConfirmationResponse(
+  db: DbClient,
+  user: any,
+  state: any,
+  response: string
+): Promise<string> {
+  const data = state.data as BatchConfirmationData;
+  const responseLower = response.toLowerCase().trim();
+
+  // Check for affirmative response
+  const affirmative = ['yes', 'y', 'yep', 'yeah', 'yup', 'sure', 'ok', 'okay', 'confirm', 'do it'];
+  if (!affirmative.includes(responseLower)) {
+    return "No worries, cancelled.";
+  }
+
+  if (!user.notionAccessToken || !user.notionTasksDatabaseId) {
+    return "Connect Notion first to complete tasks.";
+  }
+
+  try {
+    const notion = createNotionClient(user.notionAccessToken);
+
+    // Execute the batch operation based on type
+    switch (data.operation) {
+      case 'complete_all_today':
+      case 'complete_all_context': {
+        // Complete all tasks
+        for (const taskId of data.taskIds) {
+          await completeTask(notion, taskId);
+        }
+
+        // Update user stats
+        await db
+          .update(users)
+          .set({
+            totalTasksCompleted: (user.totalTasksCompleted ?? 0) + data.taskIds.length,
+            updatedAt: new Date(),
+          })
+          .where(eq(users.id, user.id));
+
+        const contextText = data.context ? ` @${data.context}` : ' today';
+        return `✅ Completed ${data.taskIds.length}${contextText} tasks!`;
+      }
+
+      case 'clear_person_agenda': {
+        // Mark all as discussed
+        for (const taskId of data.taskIds) {
+          await markDiscussed(notion, taskId);
+        }
+
+        return `✅ Cleared ${data.taskIds.length} agenda items for ${data.personName}.`;
+      }
+
+      default:
+        return "Unknown operation. Cancelled.";
+    }
+  } catch (error) {
+    console.error('[BatchConfirmation] Error:', error);
+    return "Couldn't complete batch operation. Try again later.";
+  }
 }

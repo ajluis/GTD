@@ -353,3 +353,41 @@ export function isTaskDueToday(page: any): boolean {
   const today = new Date().toISOString().split('T')[0];
   return dueDate === today;
 }
+
+/**
+ * Query tasks completed in a date range
+ * Used for weekly review "wins this week"
+ */
+export async function queryCompletedTasksInRange(
+  notion: Client,
+  databaseId: string,
+  startDate: string,
+  endDate: string
+): Promise<any[]> {
+  return queryTasks(notion, databaseId, {
+    and: [
+      { property: 'Status', select: { equals: 'Done' } },
+      { property: 'Completed', date: { on_or_after: startDate } },
+      { property: 'Completed', date: { on_or_before: endDate } },
+    ],
+  });
+}
+
+/**
+ * Query tasks due in a date range
+ * Used for weekly review "upcoming week"
+ */
+export async function queryTasksDueInRange(
+  notion: Client,
+  databaseId: string,
+  startDate: string,
+  endDate: string
+): Promise<any[]> {
+  return queryTasks(notion, databaseId, {
+    and: [
+      { property: 'Status', select: { does_not_equal: 'Done' } },
+      { property: 'Due', date: { on_or_after: startDate } },
+      { property: 'Due', date: { on_or_before: endDate } },
+    ],
+  });
+}

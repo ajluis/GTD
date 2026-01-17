@@ -25,6 +25,8 @@ export {
   queryWaitingTasks,
   querySomedayTasks,
   queryTasksByContext,
+  queryCompletedTasksInRange,
+  queryTasksDueInRange,
   findTaskByText,
   extractTaskTitle,
   extractTaskDueDate,
