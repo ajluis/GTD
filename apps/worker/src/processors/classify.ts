@@ -4,8 +4,8 @@ import { enqueueNotionSync, enqueueOutboundMessage } from '@clarity/queue';
 import type { Queue } from 'bullmq';
 import type { DbClient } from '@clarity/database';
 import { users, messages, tasks, people, conversationStates } from '@clarity/database';
-import { eq } from 'drizzle-orm';
-import { createClassifier, findBestFuzzyMatch, formatDidYouMean } from '@clarity/ai';
+import { eq, desc, and } from 'drizzle-orm';
+import { createClassifier, findBestFuzzyMatch, formatDidYouMean, type ConversationMessage } from '@clarity/ai';
 import {
   createNotionClient,
   createPerson as createNotionPerson,
@@ -159,18 +159,39 @@ export function createClassifyProcessor(
       }
     }
 
-    // 4. Classify with Gemini
-    const classification = await classifier.classify(content, peopleForMatching);
+    // 4. Fetch recent conversation history for context
+    const recentMessages = await db.query.messages.findMany({
+      where: eq(messages.userId, userId),
+      orderBy: [desc(messages.createdAt)],
+      limit: 10, // Fetch last 10 messages (will use 6 most recent)
+    });
+
+    // Convert to ConversationMessage format (oldest first for context)
+    const conversationHistory: ConversationMessage[] = recentMessages
+      .reverse() // Oldest first
+      .map((msg) => ({
+        role: msg.direction === 'inbound' ? 'user' as const : 'assistant' as const,
+        content: msg.content,
+        timestamp: msg.createdAt,
+      }));
+
+    // 5. Classify with Gemini (with conversation history)
+    const classification = await classifier.classify(
+      content,
+      peopleForMatching,
+      new Date(), // currentTime
+      conversationHistory
+    );
 
     console.log(`[Classify] Result: ${classification.type} (${classification.confidence})`);
 
-    // 5. Update message with classification
+    // 6. Update message with classification
     await db
       .update(messages)
       .set({ classification })
       .where(eq(messages.id, messageId));
 
-    // 6. Handle based on classification type
+    // 7. Handle based on classification type
     let response: string;
 
     if (classification.type === 'intent' && classification.intent) {
@@ -249,7 +270,7 @@ export function createClassifyProcessor(
       response = taskResponse;
     }
 
-    // 7. Send response
+    // 8. Send response
     await enqueueOutboundMessage(messageQueue, {
       userId,
       toNumber: user.phoneNumber,
