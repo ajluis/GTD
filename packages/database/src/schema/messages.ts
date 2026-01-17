@@ -1,5 +1,5 @@
 import { pgTable, uuid, text, timestamp, pgEnum, jsonb, index } from 'drizzle-orm/pg-core';
-import { users } from './users';
+import { users } from './users.js';
 import type { ClassificationResult } from '@clarity/shared-types';
 
 /**

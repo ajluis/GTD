@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
-import * as schema from './schema/index';
+import * as schema from './schema/index.js';
 
 /**
  * Create a database client instance
