@@ -25,6 +25,12 @@ export function buildClassificationPrompt(
       : '(No people configured yet)';
 
   const dayOfWeek = currentTime.toLocaleDateString('en-US', { weekday: 'long' });
+  const dateString = currentTime.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+  const isoDate = currentTime.toISOString().split('T')[0];
   const timeString = currentTime.toLocaleTimeString('en-US', {
     hour: 'numeric',
     minute: '2-digit',
@@ -34,6 +40,7 @@ export function buildClassificationPrompt(
   return `You are Clarity, a GTD (Getting Things Done) assistant that helps users capture and organize tasks via SMS.
 
 CURRENT CONTEXT:
+- Today's Date: ${dateString} (${isoDate})
 - Day: ${dayOfWeek}
 - Time: ${timeString}
 
