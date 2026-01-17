@@ -169,7 +169,7 @@ export async function queryTasksDueToday(
       {
         and: [
           { property: 'Due', date: { on_or_before: today } },
-          { property: 'Status', status: { does_not_equal: 'Done' } },
+          { property: 'Status', select: { does_not_equal: 'Done' } },
         ],
       },
     ],
@@ -186,7 +186,7 @@ export async function queryActiveActions(
   return queryTasks(notion, databaseId, {
     and: [
       { property: 'Type', select: { equals: 'Action' } },
-      { property: 'Status', status: { does_not_equal: 'Done' } },
+      { property: 'Status', select: { does_not_equal: 'Done' } },
     ],
   });
 }
@@ -202,7 +202,7 @@ export async function queryAgendaForPerson(
   return queryTasks(notion, databaseId, {
     and: [
       { property: 'Type', select: { equals: 'Agenda' } },
-      { property: 'Status', status: { equals: 'To Do' } },
+      { property: 'Status', select: { equals: 'To Do' } },
       { property: 'Person', relation: { contains: personPageId } },
     ],
   });
@@ -218,7 +218,7 @@ export async function queryActiveProjects(
   return queryTasks(notion, databaseId, {
     and: [
       { property: 'Type', select: { equals: 'Project' } },
-      { property: 'Status', status: { does_not_equal: 'Done' } },
+      { property: 'Status', select: { does_not_equal: 'Done' } },
     ],
   });
 }
@@ -233,7 +233,7 @@ export async function queryWaitingTasks(
   return queryTasks(notion, databaseId, {
     and: [
       { property: 'Type', select: { equals: 'Waiting' } },
-      { property: 'Status', status: { does_not_equal: 'Done' } },
+      { property: 'Status', select: { does_not_equal: 'Done' } },
     ],
   });
 }
@@ -265,7 +265,7 @@ export async function queryTasksByContext(
   return queryTasks(notion, databaseId, {
     and: [
       { property: 'Context', select: { equals: notionContext } },
-      { property: 'Status', status: { does_not_equal: 'Done' } },
+      { property: 'Status', select: { does_not_equal: 'Done' } },
     ],
   });
 }
@@ -283,7 +283,7 @@ export async function findTaskByText(
   // Notion API doesn't support full-text search on title
   const tasks = await queryTasks(notion, databaseId, {
     property: 'Status',
-    status: { does_not_equal: 'Done' },
+    select: { does_not_equal: 'Done' },
   });
 
   // Filter by text match (case-insensitive)
