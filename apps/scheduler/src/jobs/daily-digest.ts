@@ -92,16 +92,29 @@ export async function runDailyDigest(
  */
 function isDigestTime(now: Date, digestTime: string, timezone: string): boolean {
   try {
-    // Get current time in user's timezone
-    const userTime = now.toLocaleTimeString('en-US', {
+    // Parse the digest time (format: "HH:MM")
+    const [targetHour, targetMinute] = digestTime.split(':').map(Number);
+    if (targetHour === undefined || targetMinute === undefined) {
+      return false;
+    }
+
+    // Get current hour and minute in user's timezone
+    // Use numeric format to avoid locale inconsistencies
+    const hourStr = now.toLocaleString('en-US', {
       timeZone: timezone,
-      hour: '2-digit',
-      minute: '2-digit',
+      hour: 'numeric',
       hour12: false,
     });
+    const minuteStr = now.toLocaleString('en-US', {
+      timeZone: timezone,
+      minute: 'numeric',
+    });
 
-    // Compare with digest time (format: "HH:MM")
-    return userTime === digestTime;
+    const currentHour = parseInt(hourStr, 10);
+    const currentMinute = parseInt(minuteStr, 10);
+
+    // Compare hours and minutes directly
+    return currentHour === targetHour && currentMinute === targetMinute;
   } catch {
     return false;
   }
