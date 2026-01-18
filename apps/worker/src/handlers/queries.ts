@@ -19,6 +19,16 @@ import type { IntentEntities } from '@gtd/shared-types';
 import type { HandlerContext } from './intents.js';
 
 /**
+ * Get ISO date string (YYYY-MM-DD) in a specific timezone
+ */
+function getISODateInTimezone(date: Date, timezone: string): string {
+  const year = date.toLocaleString('en-US', { year: 'numeric', timeZone: timezone });
+  const month = date.toLocaleString('en-US', { month: '2-digit', timeZone: timezone });
+  const day = date.toLocaleString('en-US', { day: '2-digit', timeZone: timezone });
+  return `${year}-${month}-${day}`;
+}
+
+/**
  * Handle query_today intent
  */
 export async function handleQueryToday(ctx: HandlerContext): Promise<string> {
@@ -28,15 +38,16 @@ export async function handleQueryToday(ctx: HandlerContext): Promise<string> {
 
   try {
     const notion = createNotionClient(ctx.user.notionAccessToken);
-    const tasks = await queryTasksDueToday(notion, ctx.user.notionTasksDatabaseId);
+    const tasks = await queryTasksDueToday(notion, ctx.user.notionTasksDatabaseId, ctx.user.timezone);
 
     if (tasks.length === 0) {
       return "🔥 TODAY:\nNo tasks due today! 🎉\n\nText something to capture a task.";
     }
 
+    const today = getISODateInTimezone(new Date(), ctx.user.timezone);
     const formatted = tasks.map((t) => ({
       title: extractTaskTitle(t),
-      detail: extractTaskDueDate(t) === new Date().toISOString().split('T')[0] ? undefined : 'due soon',
+      detail: extractTaskDueDate(t) === today ? undefined : 'due soon',
     }));
 
     return formatTaskList('🔥 TODAY:', formatted);
@@ -57,10 +68,11 @@ export async function handleQueryTomorrow(ctx: HandlerContext): Promise<string> 
   try {
     const notion = createNotionClient(ctx.user.notionAccessToken);
 
-    // Calculate tomorrow's date
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowStr = tomorrow.toISOString().split('T')[0]!;
+    // Calculate tomorrow's date in user's timezone
+    const today = getISODateInTimezone(new Date(), ctx.user.timezone);
+    const [year, month, day] = today.split('-').map(Number);
+    const tomorrowDate = new Date(year!, month! - 1, day! + 1);
+    const tomorrowStr = getISODateInTimezone(tomorrowDate, ctx.user.timezone);
 
     const tasks = await queryTasksDueInRange(notion, ctx.user.notionTasksDatabaseId, tomorrowStr, tomorrowStr);
 

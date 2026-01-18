@@ -34,6 +34,7 @@ export class GTDClassifier {
    * @param currentTime - Current time for date parsing (optional)
    * @param conversationHistory - Recent conversation messages for context (optional)
    * @param mode - 'classify' (default) or 'extract' (for re-classification after clarification)
+   * @param timezone - User's timezone for date calculations (default: America/New_York)
    * @returns Classification result with type, intent, or task details
    */
   async classify(
@@ -41,9 +42,10 @@ export class GTDClassifier {
     people: PersonForMatching[] = [],
     currentTime: Date = new Date(),
     conversationHistory: ConversationMessage[] = [],
-    mode: 'classify' | 'extract' = 'classify'
+    mode: 'classify' | 'extract' = 'classify',
+    timezone: string = 'America/New_York'
   ): Promise<ClassificationResult> {
-    const prompt = buildClassificationPrompt(message, people, currentTime, conversationHistory, mode);
+    const prompt = buildClassificationPrompt(message, people, currentTime, conversationHistory, mode, timezone);
 
     try {
       const result = await this.gemini.generateJSON<RawClassificationResult>(

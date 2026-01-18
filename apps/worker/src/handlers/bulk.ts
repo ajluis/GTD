@@ -114,7 +114,7 @@ export async function handleCompleteAllToday(ctx: HandlerContext): Promise<strin
 
   try {
     const notion = createNotionClient(ctx.user.notionAccessToken);
-    const todayTasks = await queryTasksDueToday(notion, ctx.user.notionTasksDatabaseId);
+    const todayTasks = await queryTasksDueToday(notion, ctx.user.notionTasksDatabaseId, ctx.user.timezone);
 
     if (todayTasks.length === 0) {
       return "No tasks due today to complete!";

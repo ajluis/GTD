@@ -203,7 +203,9 @@ export function createClassifyProcessor(
       content,
       peopleForMatching,
       new Date(), // currentTime
-      conversationHistory
+      conversationHistory,
+      'classify',
+      user.timezone // Use user's timezone for date calculations
     );
 
     console.log(`[Classify] Result: ${classification.type} (${classification.confidence})`);
@@ -319,6 +321,16 @@ export function createClassifyProcessor(
 }
 
 /**
+ * Get ISO date string (YYYY-MM-DD) in a specific timezone
+ */
+function getISODateInTimezone(date: Date, timezone: string): string {
+  const year = date.toLocaleString('en-US', { year: 'numeric', timeZone: timezone });
+  const month = date.toLocaleString('en-US', { month: '2-digit', timeZone: timezone });
+  const day = date.toLocaleString('en-US', { day: '2-digit', timeZone: timezone });
+  return `${year}-${month}-${day}`;
+}
+
+/**
  * Handle a command
  */
 async function handleCommand(
@@ -338,15 +350,16 @@ async function handleCommand(
 
       try {
         const notion = createNotionClient(user.notionAccessToken);
-        const tasks = await queryTasksDueToday(notion, user.notionTasksDatabaseId);
+        const tasks = await queryTasksDueToday(notion, user.notionTasksDatabaseId, user.timezone);
 
         if (tasks.length === 0) {
           return "🔥 TODAY:\nNo tasks due today! 🎉\n\nText something to capture a task.";
         }
 
+        const today = getISODateInTimezone(new Date(), user.timezone);
         const formatted = tasks.map((t) => ({
           title: extractTaskTitle(t),
-          detail: extractTaskDueDate(t) === new Date().toISOString().split('T')[0] ? undefined : 'due soon',
+          detail: extractTaskDueDate(t) === today ? undefined : 'due soon',
         }));
 
         return formatTaskList('🔥 TODAY:', formatted);
@@ -920,7 +933,8 @@ async function handleClarificationResponse(
     peopleForMatching,
     new Date(),
     [],
-    'extract' // Extract mode - never return needs_clarification
+    'extract', // Extract mode - never return needs_clarification
+    user.timezone // Use user's timezone for date calculations
   );
 
   console.log(`[Clarification] Re-classification result:`, {

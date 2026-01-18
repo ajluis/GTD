@@ -7,6 +7,16 @@ import {
 import type { TaskType, TaskContext, TaskPriority } from '@gtd/shared-types';
 
 /**
+ * Get ISO date string (YYYY-MM-DD) in a specific timezone
+ */
+function getISODateInTimezone(date: Date, timezone: string): string {
+  const year = date.toLocaleString('en-US', { year: 'numeric', timeZone: timezone });
+  const month = date.toLocaleString('en-US', { month: '2-digit', timeZone: timezone });
+  const day = date.toLocaleString('en-US', { day: '2-digit', timeZone: timezone });
+  return `${year}-${month}-${day}`;
+}
+
+/**
  * Task data for creating in Notion
  */
 export interface CreateTaskData {
@@ -153,12 +163,14 @@ export async function queryTasks(
 
 /**
  * Query tasks due today
+ * @param timezone - User's timezone for calculating "today" (default: America/New_York)
  */
 export async function queryTasksDueToday(
   notion: Client,
-  databaseId: string
+  databaseId: string,
+  timezone: string = 'America/New_York'
 ): Promise<any[]> {
-  const today = new Date().toISOString().split('T')[0];
+  const today = getISODateInTimezone(new Date(), timezone);
 
   return queryTasks(notion, databaseId, {
     or: [
