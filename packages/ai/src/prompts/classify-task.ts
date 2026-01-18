@@ -356,7 +356,7 @@ ALWAYS ask for clarification when missing:
 - WHEN/DEADLINE: "By when do you need to do this?"
 - SPECIFIC DETAILS: What exactly needs to happen?
 
-Examples - these ALL need clarification:
+Examples - VAGUE tasks need clarification on WHAT and WHEN:
 - "call Rob" → "What do you need to discuss with Rob? And by when?"
 - "email Sarah" → "What's the email about? Any deadline?"
 - "slack Nick about referrals" → "What specifically about referrals? By when?"
@@ -366,7 +366,14 @@ Examples - these ALL need clarification:
 - "follow up with John" → "About what? By when?"
 - "send proposal" → "To who? Which proposal? Deadline?"
 
-Rule: If there's no deadline/timeframe mentioned, ASK FOR ONE.
+SPECIFIC tasks STILL need clarification on WHEN (deadline is ALWAYS required):
+- "Create a JD for chief of staff role" → "By when do you need to have this done?"
+- "Write a blog post about our new feature" → "What's the deadline for this?"
+- "Prepare a presentation for the board meeting" → "When do you need this ready?"
+- "Review the Q4 budget spreadsheet" → "By when?"
+- "Book flights to NYC" → "When do you need to travel?"
+
+Rule: If there's no deadline/timeframe mentioned, ALWAYS ASK FOR ONE - even if the task is otherwise clear and specific.
 
 {
   "type": "needs_clarification",
