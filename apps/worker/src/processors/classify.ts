@@ -805,6 +805,8 @@ async function createTaskFromClassification(
   // Find matched person if applicable
   let matchedPerson: PersonForMatching | undefined;
   let pendingCount = 0;
+  let autoCreatedPersonId: string | undefined;
+  let autoCreatedPersonName: string | undefined;
 
   if (
     classification.personMatch &&
@@ -823,6 +825,63 @@ async function createTaskFromClassification(
     }
   }
 
+  // AUTO-CREATE PERSON: If this is an agenda/waiting task with no matched person,
+  // try to extract and create the person automatically
+  if (!matchedPerson && (classification.type === 'agenda' || classification.type === 'waiting')) {
+    const nameMatch = rawText.match(/(?:ask|tell|with|for|from|to|@)\s+([A-Z][a-z]+)/i);
+    const extractedName = nameMatch ? nameMatch[1] : null;
+
+    if (extractedName) {
+      // Check if person already exists (case-insensitive)
+      const existingPerson = peopleForMatching.find(
+        (p) => p.name.toLowerCase() === extractedName.toLowerCase()
+      );
+
+      if (existingPerson) {
+        // Use existing person
+        matchedPerson = existingPerson;
+        const existingAgenda = await db.query.tasks.findMany({
+          where: eq(tasks.personId, existingPerson.id),
+        });
+        pendingCount = existingAgenda.filter((t) => t.status !== 'completed').length + 1;
+      } else {
+        // Create new person
+        let notionPageId: string | null = null;
+        if (user.notionAccessToken && user.notionPeopleDatabaseId) {
+          try {
+            console.log(`[AutoCreate] Creating ${extractedName} in Notion...`);
+            const notion = createNotionClient(user.notionAccessToken);
+            notionPageId = await createNotionPerson(notion, user.notionPeopleDatabaseId, {
+              name: extractedName,
+            });
+            console.log(`[AutoCreate] Created Notion page: ${notionPageId}`);
+          } catch (error) {
+            console.error(`[AutoCreate] Failed to create in Notion:`, error);
+          }
+        }
+
+        // Save to local database
+        const [newPerson] = await db.insert(people).values({
+          userId: user.id,
+          name: extractedName,
+          notionPageId,
+          active: true,
+        }).returning();
+
+        if (newPerson) {
+          autoCreatedPersonId = newPerson.id;
+          autoCreatedPersonName = extractedName;
+          pendingCount = 1;
+          console.log(`[AutoCreate] Created person: ${extractedName} (${newPerson.id})`);
+        }
+      }
+    }
+  }
+
+  // Determine final person ID and name
+  const finalPersonId = matchedPerson?.id ?? autoCreatedPersonId ?? null;
+  const finalPersonName = matchedPerson?.name ?? autoCreatedPersonName;
+
   // Create local task
   const [task] = await db
     .insert(tasks)
@@ -834,7 +893,7 @@ async function createTaskFromClassification(
       status: 'pending',
       context: classification.context ?? null,
       priority: classification.priority ?? null,
-      personId: matchedPerson?.id ?? null,
+      personId: finalPersonId,
       dueDate: classification.dueDate ?? null,
     })
     .returning();
@@ -870,7 +929,7 @@ async function createTaskFromClassification(
     classification.context,
     classification.priority,
     classification.dueDate,
-    matchedPerson?.name,
+    finalPersonName,
     pendingCount > 0 ? pendingCount : undefined
   );
 }
