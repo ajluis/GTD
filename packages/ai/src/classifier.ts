@@ -304,6 +304,7 @@ interface RawClassificationResult {
 const VALID_INTENTS: IntentType[] = [
   // Queries
   'query_today',
+  'query_tomorrow',
   'query_actions',
   'query_projects',
   'query_waiting',

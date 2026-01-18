@@ -6,6 +6,7 @@ import type { IntentResult } from '@gtd/shared-types';
 // Import handlers
 import {
   handleQueryToday,
+  handleQueryTomorrow,
   handleQueryActions,
   handleQueryProjects,
   handleQueryWaiting,
@@ -96,6 +97,8 @@ export async function handleIntent(
       // Query intents
       case 'query_today':
         return handleQueryToday(ctx);
+      case 'query_tomorrow':
+        return handleQueryTomorrow(ctx);
       case 'query_actions':
         return handleQueryActions(ctx);
       case 'query_projects':

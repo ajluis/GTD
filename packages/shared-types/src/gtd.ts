@@ -152,6 +152,7 @@ export interface PersonForMatching {
 export type IntentType =
   // Queries - user wants to SEE information
   | 'query_today'
+  | 'query_tomorrow'
   | 'query_actions'
   | 'query_projects'
   | 'query_waiting'
