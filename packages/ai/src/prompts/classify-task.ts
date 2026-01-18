@@ -200,7 +200,7 @@ TASK CAPTURE (if not an intent)
 If NOT an intent, classify as a task to capture:
 
 1. AGENDA - Discussion topic for an IN-PERSON meeting
-   Signals: "discuss with", "bring up with", "talk to [person] about", "mention to"
+   Signals: "discuss with", "bring up with", "talk to [person] about", "mention to", "ask [person] about"
    → Only for face-to-face or scheduled meeting topics
    → Match person against People list, extract topic
 
