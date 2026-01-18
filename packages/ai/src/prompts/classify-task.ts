@@ -88,6 +88,7 @@ INTENT DETECTION (check FIRST)
 1. QUERY INTENTS - User wants to SEE information
    ┌─────────────────────────────────────────────────────────────
    │ "what's on my plate today", "today's tasks", "what's due" → query_today
+   │ "what's due tomorrow", "tomorrow's tasks", "tasks for tomorrow", "what's on my plate tomorrow" → query_tomorrow
    │ "show me my actions", "what should I work on", "next actions" → query_actions
    │ "my projects", "what projects", "active projects" → query_projects
    │ "what am I waiting on", "pending from others", "who owes me" → query_waiting

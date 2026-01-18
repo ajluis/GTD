@@ -47,6 +47,39 @@ export async function handleQueryToday(ctx: HandlerContext): Promise<string> {
 }
 
 /**
+ * Handle query_tomorrow intent
+ */
+export async function handleQueryTomorrow(ctx: HandlerContext): Promise<string> {
+  if (!ctx.user.notionAccessToken || !ctx.user.notionTasksDatabaseId) {
+    return "📅 TOMORROW:\nConnect Notion first to see your tasks.";
+  }
+
+  try {
+    const notion = createNotionClient(ctx.user.notionAccessToken);
+
+    // Calculate tomorrow's date
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = tomorrow.toISOString().split('T')[0]!;
+
+    const tasks = await queryTasksDueInRange(notion, ctx.user.notionTasksDatabaseId, tomorrowStr, tomorrowStr);
+
+    if (tasks.length === 0) {
+      return "📅 TOMORROW:\nNo tasks due tomorrow.\n\nText something to capture a task.";
+    }
+
+    const formatted = tasks.map((t) => ({
+      title: extractTaskTitle(t),
+    }));
+
+    return formatTaskList('📅 TOMORROW:', formatted);
+  } catch (error) {
+    console.error('[Query:tomorrow] Error:', error);
+    return "📅 TOMORROW:\nCouldn't fetch tasks. Try again later.";
+  }
+}
+
+/**
  * Handle query_actions intent
  */
 export async function handleQueryActions(ctx: HandlerContext): Promise<string> {
