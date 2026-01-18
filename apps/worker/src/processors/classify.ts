@@ -118,6 +118,29 @@ export function createClassifyProcessor(
       return { success: true, type: 'batch_confirmation_response' };
     }
 
+    // 1d. Check for pending agenda meeting days state
+    if (pendingClarification?.stateType === 'agenda_meeting_days') {
+      const response = await handleAgendaMeetingDaysResponse(
+        db,
+        messageQueue,
+        user,
+        pendingClarification,
+        content
+      );
+
+      // Delete the state
+      await db.delete(conversationStates).where(eq(conversationStates.id, pendingClarification.id));
+
+      await enqueueOutboundMessage(messageQueue, {
+        userId,
+        toNumber: user.phoneNumber,
+        content: response,
+        inReplyTo: messageId,
+      });
+
+      return { success: true, type: 'agenda_meeting_days_response' };
+    }
+
     // 2. Check if it's a command
     if (isCommand(content)) {
       const parsed = parseCommand(content);
@@ -143,6 +166,7 @@ export function createClassifyProcessor(
       aliases: p.aliases ?? [],
       frequency: p.frequency,
       dayOfWeek: p.dayOfWeek,
+      meetingDays: (p as any).meetingDays ?? [],
     }));
 
     // 2b. Check if message is just a person's name (show their agenda)
@@ -923,6 +947,50 @@ async function createTaskFromClassification(
     return formatWaitingFollowup(classification.title ?? rawText);
   }
 
+  // AGENDA MEETING DAYS FLOW: Check if we should ask about meeting days
+  if (classification.type === 'agenda' && finalPersonId && finalPersonName) {
+    // Get the person's meeting days
+    const personMeetingDays = matchedPerson?.meetingDays ?? [];
+
+    if (personMeetingDays.length > 0) {
+      // Person has meeting days - calculate next meeting date
+      const nextMeeting = getNextMeetingDate(personMeetingDays);
+
+      if (nextMeeting) {
+        // Update task with due date
+        await db
+          .update(tasks)
+          .set({
+            dueDate: nextMeeting,
+            updatedAt: new Date(),
+          })
+          .where(eq(tasks.id, task!.id));
+
+        const formattedDate = formatNextMeetingDate(nextMeeting);
+        return `👥 ${finalPersonName}: '${classification.title ?? rawText}'\n📅 Reminder set for ${formattedDate}`;
+      }
+    } else {
+      // No meeting days - ask user when they meet with this person
+      const expiresAt = new Date();
+      expiresAt.setHours(expiresAt.getHours() + 1);
+
+      await db.insert(conversationStates).values({
+        userId: user.id,
+        stateType: 'agenda_meeting_days',
+        step: 'awaiting_days',
+        data: {
+          taskId: task!.id,
+          personId: finalPersonId,
+          personName: finalPersonName,
+          title: classification.title ?? rawText,
+        },
+        expiresAt,
+      });
+
+      return `👥 ${finalPersonName}: '${classification.title ?? rawText}'\n\nWhen do you usually meet with ${finalPersonName}? (e.g., "Tuesday Thursday" or "not sure")`;
+    }
+  }
+
   return formatTaskCapture(
     classification.title ?? rawText,
     classification.type as any,
@@ -1187,4 +1255,162 @@ async function handleBatchConfirmationResponse(
     console.error('[BatchConfirmation] Error:', error);
     return "Couldn't complete batch operation. Try again later.";
   }
+}
+
+/**
+ * Parse natural language meeting days into an array of day names
+ * Examples: "Tuesday Wednesday Thursday", "mon, wed, fri", "I'm not sure"
+ */
+function parseMeetingDays(text: string): string[] | null {
+  const textLower = text.toLowerCase().trim();
+
+  // Check for "not sure" / "don't know" type responses
+  const unsurePatterns = [
+    /not sure/i,
+    /don'?t know/i,
+    /no idea/i,
+    /unsure/i,
+    /varies/i,
+    /it depends/i,
+    /random/i,
+    /skip/i,
+  ];
+
+  if (unsurePatterns.some((p) => p.test(textLower))) {
+    return null; // Signal to skip setting meeting days
+  }
+
+  const dayMappings: Record<string, string> = {
+    'monday': 'monday', 'mon': 'monday', 'm': 'monday',
+    'tuesday': 'tuesday', 'tue': 'tuesday', 'tues': 'tuesday', 'tu': 'tuesday',
+    'wednesday': 'wednesday', 'wed': 'wednesday', 'w': 'wednesday',
+    'thursday': 'thursday', 'thu': 'thursday', 'thur': 'thursday', 'thurs': 'thursday', 'th': 'thursday',
+    'friday': 'friday', 'fri': 'friday', 'f': 'friday',
+    'saturday': 'saturday', 'sat': 'saturday', 'sa': 'saturday',
+    'sunday': 'sunday', 'sun': 'sunday', 'su': 'sunday',
+  };
+
+  const days: Set<string> = new Set();
+
+  // Split by common separators and check each word
+  const words = textLower.split(/[\s,;\/\-&]+/);
+
+  for (const word of words) {
+    const cleaned = word.replace(/[^a-z]/g, '');
+    if (dayMappings[cleaned]) {
+      days.add(dayMappings[cleaned]);
+    }
+  }
+
+  return days.size > 0 ? Array.from(days) : null;
+}
+
+/**
+ * Calculate the next occurrence of any of the given days of the week
+ */
+function getNextMeetingDate(meetingDays: string[]): Date | null {
+  if (!meetingDays || meetingDays.length === 0) {
+    return null;
+  }
+
+  const dayToNumber: Record<string, number> = {
+    'sunday': 0, 'monday': 1, 'tuesday': 2, 'wednesday': 3,
+    'thursday': 4, 'friday': 5, 'saturday': 6,
+  };
+
+  const targetDayNumbers = meetingDays
+    .map((d) => dayToNumber[d.toLowerCase()])
+    .filter((n) => n !== undefined);
+
+  if (targetDayNumbers.length === 0) {
+    return null;
+  }
+
+  const today = new Date();
+  const currentDay = today.getDay();
+
+  // Find the minimum days until next meeting
+  let minDaysUntil = 7;
+  for (const targetDay of targetDayNumbers) {
+    let daysUntil = targetDay - currentDay;
+    if (daysUntil <= 0) {
+      daysUntil += 7; // Next week
+    }
+    if (daysUntil < minDaysUntil) {
+      minDaysUntil = daysUntil;
+    }
+  }
+
+  const nextMeeting = new Date(today);
+  nextMeeting.setDate(today.getDate() + minDaysUntil);
+  nextMeeting.setHours(0, 0, 0, 0);
+
+  return nextMeeting;
+}
+
+/**
+ * Format the next meeting date for display
+ */
+function formatNextMeetingDate(date: Date): string {
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  const dayName = days[date.getDay()];
+  const monthName = months[date.getMonth()];
+  const dayOfMonth = date.getDate();
+
+  return `${dayName}, ${monthName} ${dayOfMonth}`;
+}
+
+/**
+ * Handle agenda meeting days response
+ */
+async function handleAgendaMeetingDaysResponse(
+  db: DbClient,
+  messageQueue: Queue<MessageJobData>,
+  user: any,
+  state: any,
+  response: string
+): Promise<string> {
+  const data = state.data as {
+    taskId: string;
+    personId: string;
+    personName: string;
+    title: string;
+  };
+
+  const parsedDays = parseMeetingDays(response);
+
+  // Update person with meeting days (if provided)
+  if (parsedDays && parsedDays.length > 0) {
+    await db
+      .update(people)
+      .set({
+        meetingDays: parsedDays,
+        updatedAt: new Date(),
+      } as any)
+      .where(eq(people.id, data.personId));
+
+    console.log(`[AgendaMeetingDays] Saved meeting days for ${data.personName}: ${parsedDays.join(', ')}`);
+
+    // Calculate next meeting date
+    const nextMeeting = getNextMeetingDate(parsedDays);
+
+    if (nextMeeting) {
+      // Update task with due date
+      await db
+        .update(tasks)
+        .set({
+          dueDate: nextMeeting,
+          updatedAt: new Date(),
+        })
+        .where(eq(tasks.id, data.taskId));
+
+      const formattedDate = formatNextMeetingDate(nextMeeting);
+      return `👥 ${data.personName}: '${data.title}'\n📅 Reminder set for ${formattedDate}`;
+    }
+  }
+
+  // No days provided or "not sure" - just confirm the task was saved
+  return `👥 ${data.personName}: '${data.title}'\n📋 Saved (no reminder set)`;
 }

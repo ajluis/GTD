@@ -143,6 +143,7 @@ export interface PersonForMatching {
   aliases: string[];
   frequency: MeetingFrequency | null;
   dayOfWeek: DayOfWeek | null;
+  meetingDays: string[];
 }
 
 /**

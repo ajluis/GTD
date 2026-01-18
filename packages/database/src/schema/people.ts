@@ -57,8 +57,11 @@ export const people = pgTable(
     /** How often you meet with this person */
     frequency: meetingFrequencyEnum('frequency'),
 
-    /** Which day of the week you typically meet */
+    /** Which day of the week you typically meet (legacy single day) */
     dayOfWeek: dayOfWeekEnum('day_of_week'),
+
+    /** Days of the week you meet with this person (e.g., ['monday', 'wednesday', 'friday']) */
+    meetingDays: text('meeting_days').array().default([]),
 
     // Status
     /** Whether to include in agenda routing */
