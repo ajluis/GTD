@@ -27,7 +27,8 @@ export function buildClassificationPrompt(
   people: PersonForMatching[],
   currentTime: Date,
   conversationHistory: ConversationMessage[] = [],
-  mode: 'classify' | 'extract' = 'classify'
+  mode: 'classify' | 'extract' = 'classify',
+  timezone: string = 'America/New_York'
 ): string {
   const peopleList =
     people.length > 0
@@ -39,17 +40,24 @@ export function buildClassificationPrompt(
           .join('\n')
       : '(No people configured yet)';
 
-  const dayOfWeek = currentTime.toLocaleDateString('en-US', { weekday: 'long' });
+  // Format date/time in user's timezone to avoid UTC confusion
+  const dayOfWeek = currentTime.toLocaleDateString('en-US', { weekday: 'long', timeZone: timezone });
   const dateString = currentTime.toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
+    timeZone: timezone,
   });
-  const isoDate = currentTime.toISOString().split('T')[0];
+  // Calculate ISO date in user's timezone (not UTC)
+  const year = currentTime.toLocaleString('en-US', { year: 'numeric', timeZone: timezone });
+  const month = currentTime.toLocaleString('en-US', { month: '2-digit', timeZone: timezone });
+  const day = currentTime.toLocaleString('en-US', { day: '2-digit', timeZone: timezone });
+  const isoDate = `${year}-${month}-${day}`;
   const timeString = currentTime.toLocaleTimeString('en-US', {
     hour: 'numeric',
     minute: '2-digit',
     hour12: true,
+    timeZone: timezone,
   });
 
   // Format conversation history (most recent last, limit to last 6 messages)

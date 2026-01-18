@@ -135,6 +135,7 @@ async function checkRecentDigest(_db: DbClient, _userId: string): Promise<boolea
 async function getDigestData(user: {
   notionAccessToken: string | null;
   notionTasksDatabaseId: string | null;
+  timezone: string;
 }): Promise<DigestData | null> {
   if (!user.notionAccessToken || !user.notionTasksDatabaseId) {
     return null;
@@ -143,7 +144,7 @@ async function getDigestData(user: {
   const notion = createNotionClient(user.notionAccessToken);
 
   const [todayTasks, allActions] = await Promise.all([
-    queryTasksDueToday(notion, user.notionTasksDatabaseId),
+    queryTasksDueToday(notion, user.notionTasksDatabaseId, user.timezone),
     queryActiveActions(notion, user.notionTasksDatabaseId),
   ]);
 
