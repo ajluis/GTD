@@ -262,6 +262,7 @@ function parseResponse(
     if (jsonStr.startsWith('{')) {
       const parsed = JSON.parse(jsonStr);
 
+      // Handle tool_calls format
       if (parsed.tool_calls && Array.isArray(parsed.tool_calls)) {
         return {
           type: 'tool_calls',
@@ -270,6 +271,11 @@ function parseResponse(
             parameters: call.parameters || {},
           })),
         };
+      }
+
+      // Handle {"response": "..."} format - extract the text
+      if (parsed.response && typeof parsed.response === 'string') {
+        return { type: 'text', content: parsed.response };
       }
     }
   } catch {
