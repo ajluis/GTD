@@ -2,7 +2,162 @@
 
 ## Overview
 
-The hybrid/tool-based architecture enables conversational features that are difficult or impossible with the current single-shot classification approach. These features leverage the LLM's ability to:
+The hybrid/tool-based architecture enables conversational features that are difficult or impossible with the current single-shot classification approach.
+
+---
+
+## 0. Meeting Brain Dump (High Priority)
+
+### Current Limitation
+The classifier handles ONE item per message. Multi-item dumps get confused or only capture the first item.
+
+### With Tools
+
+```
+User: "Just finished meeting with Sarah:
+- follow up on budget proposal
+- waiting on her for Q4 numbers
+- need to ask Mike about timeline
+- call John re contract by Friday"
+
+LLM: // Parses as multiple items, classifies each
+create_task({ title: "Follow up on budget proposal", type: "action", personId: "sarah" })
+create_task({ title: "Sarah to provide Q4 numbers", type: "waiting", personId: "sarah" })
+create_task({ title: "Ask Mike about timeline", type: "agenda", personId: "mike" })
+create_task({ title: "Call John re contract", type: "action", dueDate: "2026-01-24" })
+
+Response: "Got it! Captured 4 items from your Sarah meeting:
+
+✅ ACTION: Follow up on budget proposal
+⏳ WAITING: Sarah to provide Q4 numbers
+👤 AGENDA (Mike): Ask about timeline
+✅ ACTION: Call John re contract (due Fri)
+
+Anything to add?"
+```
+
+### More Examples
+
+**Mixed types in one message:**
+```
+User: "After the team standup:
+john owes me the design specs
+remind me to book the venue
+talk to lisa about hiring
+maybe look into new project mgmt tool"
+
+Response: "Captured 4 items:
+
+⏳ WAITING: John to deliver design specs
+✅ ACTION: Book the venue
+👤 AGENDA (Lisa): Discuss hiring
+💭 SOMEDAY: Look into new project mgmt tool"
+```
+
+**With ambiguity - asks follow-ups:**
+```
+User: "from client call:
+- proposal changes
+- contract review
+- check with legal"
+
+LLM: // Detects ambiguity
+
+Response: "I captured 3 items, but need some clarity:
+
+1. 'Proposal changes' - is this:
+   a) Something YOU need to do (action)?
+   b) Something you're WAITING ON from the client?
+
+2. 'Contract review' - same question
+
+3. 'Check with legal' - is this:
+   a) An agenda item for a meeting with legal?
+   b) An action for you to email/call them?
+
+Reply with like '1a, 2b, 3b' or just clarify"
+```
+
+**Intelligent parsing:**
+```
+User: "Quick dump:
+Sarah - quarterly planning (tues)
+waiting mike budget approval
+someday: learn figma
+@errands pick up dry cleaning
+call insurance re claim #12345"
+
+Response: "Got 5 items:
+
+👤 AGENDA (Sarah): Quarterly planning - for your Tuesday meeting
+⏳ WAITING: Mike to approve budget
+💭 SOMEDAY: Learn Figma
+✅ ACTION: Pick up dry cleaning (@errands)
+✅ ACTION: Call insurance re claim #12345 (@phone)
+
+All captured!"
+```
+
+### Implementation
+
+```typescript
+// New tool: batch_create_tasks
+const batchCreateTasks: Tool = {
+  name: 'batch_create_tasks',
+  description: 'Create multiple tasks at once from a brain dump or meeting notes',
+  parameters: {
+    type: 'object',
+    properties: {
+      tasks: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            title: { type: 'string' },
+            type: { type: 'string', enum: ['action', 'project', 'waiting', 'someday', 'agenda'] },
+            context: { type: 'string' },
+            priority: { type: 'string' },
+            dueDate: { type: 'string' },
+            personName: { type: 'string' },
+            needsClarification: { type: 'boolean' },
+            clarificationQuestion: { type: 'string' }
+          },
+          required: ['title', 'type']
+        }
+      }
+    },
+    required: ['tasks']
+  }
+};
+```
+
+### Prompt Engineering for Multi-Item Detection
+
+```
+MULTI-ITEM DETECTION:
+
+If the message contains multiple items (bullet points, numbered lists, line breaks,
+or phrases like "also", "and", "plus"), parse each as a separate task.
+
+Signals of multi-item message:
+- Bullet points (-, *, •)
+- Numbered items (1., 2., etc)
+- Line breaks with distinct items
+- "also", "and also", "plus", "oh and"
+- Context headers: "from meeting:", "quick dump:", "notes:"
+
+For each item, independently determine:
+- Task type (action, waiting, agenda, project, someday)
+- Person involved (if any)
+- Due date (if mentioned)
+- Context (computer, phone, home, outside)
+
+If an item is ambiguous, flag it for clarification but still capture the others.
+```
+
+---
+
+These features leverage the LLM's ability to:
 - Request data on-demand
 - Maintain conversation context
 - Generate dynamic responses
