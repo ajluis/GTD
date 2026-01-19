@@ -51,6 +51,7 @@ Set needsDataLookup: FALSE when:
 Set needsDataLookup: TRUE when:
 - Person-specific queries: "Sarah's agenda", "what do I have with Mike"
 - Task search needed: "complete the design task", "mark that as done"
+- Task modifications: "change my shopping task", "update the budget task", "rename X to Y"
 - Complex queries: "tasks due this week for John"
 - Bulk operations: "complete all errands"
 - Undo/corrections needing context: "undo that", "wrong person"
