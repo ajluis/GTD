@@ -85,45 +85,46 @@ export const getProductivityStats: Tool = {
         where: eq(tasks.userId, context.userId),
       });
 
+      type TaskType = typeof allTasks[0];
       const activeTasks = allTasks.filter(
-        (t) => t.status !== 'completed' && t.status !== 'discussed'
+        (t: TaskType) => t.status !== 'completed' && t.status !== 'discussed'
       );
       const completedTasks = allTasks.filter(
-        (t) => t.status === 'completed' || t.status === 'discussed'
+        (t: TaskType) => t.status === 'completed' || t.status === 'discussed'
       );
 
       // Recent completions
       const recentCompletions = completedTasks.filter(
-        (t) => t.completedAt && t.completedAt >= cutoffDate
+        (t: TaskType) => t.completedAt && t.completedAt >= cutoffDate
       );
 
       // Recent additions
       const recentAdditions = allTasks.filter(
-        (t) => t.createdAt >= cutoffDate
+        (t: TaskType) => t.createdAt >= cutoffDate
       );
 
       // Tasks by type
       const byType = {
-        action: activeTasks.filter((t) => t.type === 'action').length,
-        project: activeTasks.filter((t) => t.type === 'project').length,
-        waiting: activeTasks.filter((t) => t.type === 'waiting').length,
-        someday: activeTasks.filter((t) => t.type === 'someday').length,
-        agenda: activeTasks.filter((t) => t.type === 'agenda').length,
+        action: activeTasks.filter((t: TaskType) => t.type === 'action').length,
+        project: activeTasks.filter((t: TaskType) => t.type === 'project').length,
+        waiting: activeTasks.filter((t: TaskType) => t.type === 'waiting').length,
+        someday: activeTasks.filter((t: TaskType) => t.type === 'someday').length,
+        agenda: activeTasks.filter((t: TaskType) => t.type === 'agenda').length,
       };
 
       // Tasks by context
       const byContext = {
-        computer: activeTasks.filter((t) => t.context === 'computer').length,
-        phone: activeTasks.filter((t) => t.context === 'phone').length,
-        home: activeTasks.filter((t) => t.context === 'home').length,
-        outside: activeTasks.filter((t) => t.context === 'outside').length,
-        unassigned: activeTasks.filter((t) => !t.context).length,
+        computer: activeTasks.filter((t: TaskType) => t.context === 'computer').length,
+        phone: activeTasks.filter((t: TaskType) => t.context === 'phone').length,
+        home: activeTasks.filter((t: TaskType) => t.context === 'home').length,
+        outside: activeTasks.filter((t: TaskType) => t.context === 'outside').length,
+        unassigned: activeTasks.filter((t: TaskType) => !t.context).length,
       };
 
       // Overdue tasks
       const today = new Date().toISOString().split('T')[0];
       const overdueTasks = activeTasks.filter(
-        (t) => t.dueDate && t.dueDate < today
+        (t: TaskType) => t.dueDate && today && t.dueDate < today
       );
 
       // People count
@@ -154,8 +155,8 @@ export const getProductivityStats: Tool = {
           byContext,
           people: {
             total: userPeople.length,
-            withPendingAgenda: userPeople.filter((p) =>
-              activeTasks.some((t) => t.personId === p.id && t.type === 'agenda')
+            withPendingAgenda: userPeople.filter((p: typeof userPeople[0]) =>
+              activeTasks.some((t: TaskType) => t.personId === p.id && t.type === 'agenda')
             ).length,
           },
         },

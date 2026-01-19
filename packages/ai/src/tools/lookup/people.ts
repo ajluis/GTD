@@ -38,12 +38,19 @@ export const lookupPeople: Tool = {
     };
 
     try {
-      let results;
+      let results: Array<{
+        id: string;
+        name: string;
+        aliases: string[] | null;
+        frequency: string | null;
+        dayOfWeek: string | null;
+        notionPageId: string | null;
+      }>;
 
       if (query) {
         // Search by name or alias
         const searchPattern = `%${query}%`;
-        results = await context.db.query.people.findMany({
+        const dbResults = await context.db.query.people.findMany({
           where: and(
             eq(people.userId, context.userId),
             eq(people.active, true),
@@ -56,6 +63,8 @@ export const lookupPeople: Tool = {
           limit: limit,
         });
 
+        results = dbResults;
+
         // Also check aliases manually (since JSONB array search is complex)
         if (results.length === 0) {
           const allPeople = await context.db.query.people.findMany({
@@ -66,10 +75,9 @@ export const lookupPeople: Tool = {
           });
 
           const lowerQuery = query.toLowerCase();
-          results = allPeople.filter(
-            (p) =>
-              p.name.toLowerCase().includes(lowerQuery) ||
-              p.aliases?.some((a) => a.toLowerCase().includes(lowerQuery))
+          results = allPeople.filter((p: typeof allPeople[0]) =>
+            p.name.toLowerCase().includes(lowerQuery) ||
+            p.aliases?.some((a: string) => a.toLowerCase().includes(lowerQuery))
           ).slice(0, limit);
         }
       } else if (meetingDay) {
@@ -78,7 +86,7 @@ export const lookupPeople: Tool = {
           where: and(
             eq(people.userId, context.userId),
             eq(people.active, true),
-            eq(people.dayOfWeek, meetingDay as any)
+            eq(people.dayOfWeek, meetingDay as typeof people.dayOfWeek.enumValues[number])
           ),
           limit: limit,
         });
@@ -93,7 +101,7 @@ export const lookupPeople: Tool = {
         });
       }
 
-      const formattedResults = results.map((p) => ({
+      const formattedResults = results.map((p: typeof results[0]) => ({
         id: p.id,
         name: p.name,
         aliases: p.aliases ?? [],
@@ -109,7 +117,7 @@ export const lookupPeople: Tool = {
           people: formattedResults,
         },
         trackEntities: {
-          people: formattedResults.map((p) => ({ id: p.id, name: p.name })),
+          people: formattedResults.map((p: typeof formattedResults[0]) => ({ id: p.id, name: p.name })),
         },
       };
     } catch (error) {

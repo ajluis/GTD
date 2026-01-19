@@ -161,10 +161,10 @@ export const updatePerson: Tool = {
       // Build update
       const updates: Record<string, unknown> = { updatedAt: new Date() };
 
-      if (name !== undefined) updates.name = name;
-      if (aliases !== undefined) updates.aliases = aliases;
-      if (frequency !== undefined) updates.frequency = frequency;
-      if (dayOfWeek !== undefined) updates.dayOfWeek = dayOfWeek;
+      if (name !== undefined) updates['name'] = name;
+      if (aliases !== undefined) updates['aliases'] = aliases;
+      if (frequency !== undefined) updates['frequency'] = frequency;
+      if (dayOfWeek !== undefined) updates['dayOfWeek'] = dayOfWeek;
 
       // Update
       const [updated] = await context.db

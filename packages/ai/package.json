@@ -18,8 +18,10 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@gtd/database": "workspace:*",
     "@gtd/shared-types": "workspace:*",
-    "@google/generative-ai": "^0.21.0"
+    "@google/generative-ai": "^0.21.0",
+    "drizzle-orm": "^0.38.3"
   },
   "devDependencies": {
     "typescript": "^5.3.3"

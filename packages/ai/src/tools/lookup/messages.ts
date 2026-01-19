@@ -48,7 +48,7 @@ export const lookupMessages: Tool = {
       // Reverse to get chronological order (oldest first)
       const chronological = results.reverse();
 
-      const formattedResults = chronological.map((m) => ({
+      const formattedResults = chronological.map((m: typeof chronological[0]) => ({
         id: m.id,
         direction: m.direction,
         content: m.content,

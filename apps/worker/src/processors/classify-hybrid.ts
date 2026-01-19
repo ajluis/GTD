@@ -19,16 +19,14 @@ import { eq, desc } from 'drizzle-orm';
 import {
   createFastClassifier,
   type FastClassifyOptions,
-} from '@gtd/ai/classifier/fast';
-import { runAgentLoop } from '@gtd/ai/agent/loop';
-import { createContextManager } from '@gtd/ai/agent/context';
-import {
+  runAgentLoop,
+  createContextManager,
   toolSets,
   createTask as createTaskTool,
   batchCreateTasks as batchCreateTasksTool,
   type ToolContext,
   type FastClassifyResult,
-} from '@gtd/ai/tools';
+} from '@gtd/ai';
 
 // Legacy imports for direct execution
 import { formatTaskCapture, formatHelp } from '@gtd/gtd';
