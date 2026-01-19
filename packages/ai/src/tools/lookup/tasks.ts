@@ -4,7 +4,7 @@
  */
 
 import type { Tool, ToolContext, ToolResult } from '../types.js';
-import { tasks } from '@gtd/database';
+import { tasks, people } from '@gtd/database';
 import { eq, and, or, ilike, lte, gte, ne, desc, asc, isNull, isNotNull } from 'drizzle-orm';
 
 export const lookupTasks: Tool = {
@@ -34,7 +34,11 @@ export const lookupTasks: Tool = {
       },
       personId: {
         type: 'string',
-        description: 'Filter by person ID (from lookup_people)',
+        description: 'Filter by person ID (UUID from lookup_people). Use personName instead if you only have the name.',
+      },
+      personName: {
+        type: 'string',
+        description: 'Filter by person name (will be resolved to ID automatically). Use this when you have a name like "Lily" instead of a UUID.',
       },
       dueBefore: {
         type: 'string',
@@ -75,6 +79,7 @@ export const lookupTasks: Tool = {
       status = 'active',
       context: taskContext,
       personId,
+      personName,
       dueBefore,
       dueAfter,
       dueToday,
@@ -87,6 +92,7 @@ export const lookupTasks: Tool = {
       status?: string;
       context?: string;
       personId?: string;
+      personName?: string;
       dueBefore?: string;
       dueAfter?: string;
       dueToday?: boolean;
@@ -96,6 +102,31 @@ export const lookupTasks: Tool = {
     };
 
     try {
+      // Resolve personName to personId if provided
+      let resolvedPersonId = personId;
+      if (!resolvedPersonId && personName) {
+        const userPeople = await context.db.query.people.findMany({
+          where: eq(people.userId, context.userId),
+        });
+        const match = userPeople.find(
+          (p: typeof userPeople[0]) =>
+            p.name.toLowerCase() === personName.toLowerCase() ||
+            p.aliases?.some((a: string) => a.toLowerCase() === personName.toLowerCase())
+        );
+        if (match) {
+          resolvedPersonId = match.id;
+        } else {
+          return {
+            success: true,
+            data: {
+              count: 0,
+              tasks: [],
+              message: `No person found matching "${personName}"`,
+            },
+          };
+        }
+      }
+
       // Build filter conditions
       const conditions = [eq(tasks.userId, context.userId)];
 
@@ -127,8 +158,8 @@ export const lookupTasks: Tool = {
       }
 
       // Person filter
-      if (personId) {
-        conditions.push(eq(tasks.personId, personId));
+      if (resolvedPersonId) {
+        conditions.push(eq(tasks.personId, resolvedPersonId));
       }
 
       // Search filter
