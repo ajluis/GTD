@@ -102,9 +102,14 @@ export const lookupTasks: Tool = {
     };
 
     try {
-      // Resolve personName to personId if provided
+      // Resolve personName to personId if provided, and also prepare title search
       let resolvedPersonId = personId;
+      let personNameForTitleSearch: string | undefined;
+
       if (!resolvedPersonId && personName) {
+        personNameForTitleSearch = personName; // Will search title for this name
+
+        // Also try to find linked person record
         const userPeople = await context.db.query.people.findMany({
           where: eq(people.userId, context.userId),
         });
@@ -115,16 +120,8 @@ export const lookupTasks: Tool = {
         );
         if (match) {
           resolvedPersonId = match.id;
-        } else {
-          return {
-            success: true,
-            data: {
-              count: 0,
-              tasks: [],
-              message: `No person found matching "${personName}"`,
-            },
-          };
         }
+        // Don't return early - we'll search both by personId AND title
       }
 
       // Build filter conditions
@@ -157,9 +154,21 @@ export const lookupTasks: Tool = {
         conditions.push(eq(tasks.context, taskContext as any));
       }
 
-      // Person filter
-      if (resolvedPersonId) {
+      // Person filter - check both linked personId AND name in title
+      if (resolvedPersonId && personNameForTitleSearch) {
+        // Have both - search by personId OR name in title
+        conditions.push(
+          or(
+            eq(tasks.personId, resolvedPersonId),
+            ilike(tasks.title, `%${personNameForTitleSearch}%`)
+          )!
+        );
+      } else if (resolvedPersonId) {
+        // Only have personId
         conditions.push(eq(tasks.personId, resolvedPersonId));
+      } else if (personNameForTitleSearch) {
+        // Only have name - search title
+        conditions.push(ilike(tasks.title, `%${personNameForTitleSearch}%`));
       }
 
       // Search filter
