@@ -44,17 +44,18 @@ needsDataLookup DECISION
 
 Set needsDataLookup: FALSE when:
 - Simple task capture: "Buy milk", "Call mom tomorrow"
-- Simple queries with fixed targets: "show today", "my actions", "help"
+- Help requests: "help", "commands", "what can you do"
 - Settings changes: "set timezone to PST"
-- Simple completions of specific tasks: "done with dentist call"
 
 Set needsDataLookup: TRUE when:
+- ANY query about tasks: "show today", "what's tomorrow", "my actions", "projects"
 - Person-specific queries: "Sarah's agenda", "what do I have with Mike"
 - Task search needed: "complete the design task", "mark that as done"
 - Task modifications: "change my shopping task", "update the budget task", "rename X to Y"
 - Complex queries: "tasks due this week for John"
 - Bulk operations: "complete all errands"
 - Undo/corrections needing context: "undo that", "wrong person"
+- Simple completions: "done with dentist call" (needs to find and update task)
 
 ═══════════════════════════════════════════════════════════════
 MULTI-ITEM DETECTION
