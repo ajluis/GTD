@@ -176,7 +176,22 @@ function buildFullPrompt(
   messages: Message[],
   tools: Tool[]
 ): string {
-  const toolInstructions = `
+  // Check if we already have tool results
+  const hasToolResults = messages.some((m) => m.role === 'tool');
+
+  const toolInstructions = hasToolResults
+    ? `
+═══════════════════════════════════════════════════════════════
+IMPORTANT: TOOL RESULTS RECEIVED - RESPOND WITH TEXT NOW
+═══════════════════════════════════════════════════════════════
+
+You have received tool results. Now provide a FINAL TEXT RESPONSE to the user.
+DO NOT call any more tools. Respond with plain text summarizing what you found.
+
+If no results matched, say so helpfully. If results were found, present them clearly.
+Keep the response SMS-friendly (under 320 characters when possible).
+`
+    : `
 ═══════════════════════════════════════════════════════════════
 TOOL USAGE INSTRUCTIONS
 ═══════════════════════════════════════════════════════════════
