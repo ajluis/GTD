@@ -8,6 +8,40 @@ import { tasks, users, people } from '@gtd/database';
 import { eq, and, ilike } from 'drizzle-orm';
 
 /**
+ * Generate search variations for fuzzy matching
+ * "shopping" -> ["shopping", "shop"]
+ * "running" -> ["running", "run"]
+ * "clothes" -> ["clothes", "cloth"]
+ */
+function generateSearchVariations(searchText: string): string[] {
+  const variations = [searchText];
+  const words = searchText.split(/\s+/);
+
+  for (const word of words) {
+    // Strip common suffixes
+    const suffixes = ['ing', 'ed', 'es', 's', 'er', 'ly', 'tion', 'ment'];
+    for (const suffix of suffixes) {
+      if (word.endsWith(suffix) && word.length > suffix.length + 2) {
+        const root = word.slice(0, -suffix.length);
+        if (!variations.includes(root)) {
+          variations.push(root);
+        }
+        // Handle doubling (shopping -> shop, running -> run)
+        if (root.length > 2 && root[root.length - 1] === root[root.length - 2]) {
+          const shortened = root.slice(0, -1);
+          if (!variations.includes(shortened)) {
+            variations.push(shortened);
+          }
+        }
+        break;
+      }
+    }
+  }
+
+  return variations;
+}
+
+/**
  * Create a new task
  */
 export const createTask: Tool = {
@@ -242,6 +276,9 @@ export const updateTask: Tool = {
 
       // If no taskId but searchText provided, search for the task
       if (!resolvedTaskId && searchText) {
+        // Generate search variations (e.g., "shopping" -> ["shopping", "shop"])
+        const searchVariations = generateSearchVariations(searchText.toLowerCase());
+
         // First try Notion if available
         if (context.notionClient && context.notionTasksDatabaseId) {
           const response = await context.notionClient.databases.query({
@@ -254,10 +291,9 @@ export const updateTask: Tool = {
             page_size: 50,
           });
 
-          const searchLower = searchText.toLowerCase();
           const match = response.results.find((page: any) => {
-            const title = page.properties?.Task?.title?.[0]?.plain_text ?? '';
-            return title.toLowerCase().includes(searchLower);
+            const title = (page.properties?.Task?.title?.[0]?.plain_text ?? '').toLowerCase();
+            return searchVariations.some(term => title.includes(term));
           });
 
           if (match) {
@@ -265,18 +301,21 @@ export const updateTask: Tool = {
           }
         }
 
-        // Fall back to local DB
+        // Fall back to local DB - try each variation
         if (!resolvedTaskId) {
-          const localTasks = await context.db.query.tasks.findMany({
-            where: and(
-              eq(tasks.userId, context.userId),
-              ilike(tasks.title, `%${searchText}%`)
-            ),
-            limit: 1,
-          });
+          for (const term of searchVariations) {
+            const localTasks = await context.db.query.tasks.findMany({
+              where: and(
+                eq(tasks.userId, context.userId),
+                ilike(tasks.title, `%${term}%`)
+              ),
+              limit: 1,
+            });
 
-          if (localTasks.length > 0) {
-            resolvedTaskId = localTasks[0]!.id;
+            if (localTasks.length > 0) {
+              resolvedTaskId = localTasks[0]!.id;
+              break;
+            }
           }
         }
       }
