@@ -7,7 +7,7 @@ import {
   type MessageJobData,
 } from '@gtd/queue';
 import { createInboundProcessor } from './processors/inbound.js';
-import { createClassifyProcessor } from './processors/classify.js';
+import { createHybridClassifyProcessor } from './processors/classify-hybrid.js';
 import { createNotionSyncProcessor } from './processors/notion-sync.js';
 import { createOutboundProcessor } from './processors/outbound.js';
 
@@ -55,7 +55,7 @@ async function main() {
 
   // Create processors
   const inboundProcessor = createInboundProcessor(db, messageQueue, config.appUrl);
-  const classifyProcessor = createClassifyProcessor(db, messageQueue);
+  const classifyProcessor = createHybridClassifyProcessor(db, messageQueue);
   const notionSyncProcessor = createNotionSyncProcessor(db);
   const outboundProcessor = createOutboundProcessor(db);
 
