@@ -3,7 +3,7 @@ import type { NotionSyncJobData } from '@gtd/queue';
 import type { DbClient } from '@gtd/database';
 import { users, tasks, people } from '@gtd/database';
 import { eq } from 'drizzle-orm';
-import { createNotionClient, createTask as createNotionTask } from '@gtd/notion';
+import { createNotionClient, createTask as createNotionTask, createPerson as createNotionPerson } from '@gtd/notion';
 
 /**
  * Notion Sync Processor
@@ -42,13 +42,50 @@ export function createNotionSyncProcessor(db: DbClient) {
       throw new Error(`Task not found: ${taskId}`);
     }
 
-    // 3. Get person's Notion page ID if applicable
+    // 3. Get or create person in Notion if applicable
     let personNotionPageId: string | null = null;
     if (task.personId) {
       const person = await db.query.people.findFirst({
         where: eq(people.id, task.personId),
       });
-      personNotionPageId = person?.notionPageId ?? null;
+
+      if (person) {
+        if (person.notionPageId) {
+          // Person already synced to Notion
+          personNotionPageId = person.notionPageId;
+        } else if (user.notionPeopleDatabaseId) {
+          // Person not yet in Notion - create them
+          console.log(`[NotionSync] Creating person "${person.name}" in Notion`);
+          const notion = createNotionClient(user.notionAccessToken);
+
+          try {
+            personNotionPageId = await createNotionPerson(
+              notion,
+              user.notionPeopleDatabaseId,
+              {
+                name: person.name,
+                aliases: person.aliases || undefined,
+                frequency: person.frequency as any || undefined,
+                dayOfWeek: person.dayOfWeek as any || undefined,
+              }
+            );
+
+            // Update local person with Notion page ID
+            await db
+              .update(people)
+              .set({
+                notionPageId: personNotionPageId,
+                updatedAt: new Date(),
+              })
+              .where(eq(people.id, person.id));
+
+            console.log(`[NotionSync] Created person in Notion: ${personNotionPageId}`);
+          } catch (personError) {
+            console.error(`[NotionSync] Failed to create person in Notion:`, personError);
+            // Continue without person link - task can still be created
+          }
+        }
+      }
     }
 
     // 4. Create in Notion

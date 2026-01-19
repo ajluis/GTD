@@ -85,10 +85,15 @@ ACTION (default): Single next step the user can take
 WAITING: Delegated or expecting from someone else
   - "waiting on", "John owes me", "asked Sarah for"
   - Title format: "[Person] to [deliverable]"
+  - ALWAYS extract personName (required for waiting items)
+  - Capture dueDate if mentioned
 
 AGENDA: Discussion topic for an in-person meeting
   - "ask [person] about", "discuss with", "bring up with"
   - NOT for: email, text, call (those are actions)
+  - ALWAYS extract personName (required for agenda items)
+  - Capture dueDate if mentioned (e.g., "before Friday's meeting")
+  - DO NOT set context (the person IS the context)
 
 PROJECT: Multi-step outcome
   - "plan", "organize", "launch" + complex goal
