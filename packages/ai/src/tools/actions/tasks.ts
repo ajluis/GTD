@@ -177,13 +177,17 @@ export const createTask: Tool = {
  */
 export const updateTask: Tool = {
   name: 'update_task',
-  description: 'Update an existing task. Use this to change title, type, context, priority, due date, or person.',
+  description: 'Update an existing task. Provide either taskId OR searchText to find the task. Use this to change title, type, context, priority, due date, or person.',
   parameters: {
     type: 'object',
     properties: {
       taskId: {
         type: 'string',
-        description: 'Task ID (from lookup_tasks)',
+        description: 'Task ID (from lookup_tasks). If not provided, use searchText to find the task.',
+      },
+      searchText: {
+        type: 'string',
+        description: 'Text to search for in task titles (e.g., "shopping" will find "Go shopping"). Use this if you don\'t have the taskId.',
       },
       title: {
         type: 'string',
@@ -218,11 +222,12 @@ export const updateTask: Tool = {
         description: 'Notes to add or replace',
       },
     },
-    required: ['taskId'],
+    required: [],
   },
   execute: async (params: unknown, context: ToolContext): Promise<ToolResult> => {
-    const { taskId, ...updates } = params as {
-      taskId: string;
+    const { taskId, searchText, ...updates } = params as {
+      taskId?: string;
+      searchText?: string;
       title?: string;
       type?: string;
       context?: string;
@@ -233,15 +238,69 @@ export const updateTask: Tool = {
     };
 
     try {
+      let resolvedTaskId = taskId;
+
+      // If no taskId but searchText provided, search for the task
+      if (!resolvedTaskId && searchText) {
+        // First try Notion if available
+        if (context.notionClient && context.notionTasksDatabaseId) {
+          const response = await context.notionClient.databases.query({
+            database_id: context.notionTasksDatabaseId,
+            filter: {
+              and: [
+                { property: 'Status', select: { does_not_equal: 'Done' } },
+              ],
+            },
+            page_size: 50,
+          });
+
+          const searchLower = searchText.toLowerCase();
+          const match = response.results.find((page: any) => {
+            const title = page.properties?.Task?.title?.[0]?.plain_text ?? '';
+            return title.toLowerCase().includes(searchLower);
+          });
+
+          if (match) {
+            resolvedTaskId = (match as any).id;
+          }
+        }
+
+        // Fall back to local DB
+        if (!resolvedTaskId) {
+          const localTasks = await context.db.query.tasks.findMany({
+            where: and(
+              eq(tasks.userId, context.userId),
+              ilike(tasks.title, `%${searchText}%`)
+            ),
+            limit: 1,
+          });
+
+          if (localTasks.length > 0) {
+            resolvedTaskId = localTasks[0]!.id;
+          }
+        }
+      }
+
+      if (!resolvedTaskId) {
+        return {
+          success: false,
+          error: searchText
+            ? `No task found matching "${searchText}". Try being more specific or check your task list.`
+            : 'Please provide either taskId or searchText to find the task.',
+        };
+      }
+
       // Get current task for undo
       const currentTask = await context.db.query.tasks.findFirst({
-        where: and(eq(tasks.id, taskId), eq(tasks.userId, context.userId)),
+        where: and(eq(tasks.id, resolvedTaskId), eq(tasks.userId, context.userId)),
       });
 
       if (!currentTask) {
+        // Task might be in Notion only - for now return error
+        // TODO: Support updating Notion-only tasks
         return {
           success: false,
-          error: 'Task not found',
+          error: 'Task found in Notion but not synced locally. Please sync first.',
         };
       }
 
@@ -282,7 +341,7 @@ export const updateTask: Tool = {
       const [updated] = await context.db
         .update(tasks)
         .set(updateData)
-        .where(eq(tasks.id, taskId))
+        .where(eq(tasks.id, resolvedTaskId))
         .returning();
 
       return {
@@ -294,11 +353,11 @@ export const updateTask: Tool = {
           context: updated!.context,
           priority: updated!.priority,
           dueDate: updated!.dueDate,
-          changes: Object.keys(updates).filter((k) => k !== 'taskId'),
+          changes: Object.keys(updates).filter((k) => k !== 'taskId' && k !== 'searchText'),
         },
         undoAction: {
           type: 'revert_task_update',
-          taskId: taskId,
+          taskId: resolvedTaskId,
           previousData,
         },
       };
