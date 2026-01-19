@@ -88,9 +88,9 @@ export const createTask: Tool = {
         });
 
         const match = existingPeople.find(
-          (p) =>
+          (p: typeof existingPeople[0]) =>
             p.name.toLowerCase() === personName.toLowerCase() ||
-            p.aliases?.some((a) => a.toLowerCase() === personName.toLowerCase())
+            p.aliases?.some((a: string) => a.toLowerCase() === personName.toLowerCase())
         );
 
         if (match) {
@@ -132,12 +132,11 @@ export const createTask: Tool = {
         .returning();
 
       // Update user stats
+      const currentUser = await context.db.query.users.findFirst({ where: eq(users.id, context.userId) });
       await context.db
         .update(users)
         .set({
-          totalTasksCaptured: await context.db.query.users
-            .findFirst({ where: eq(users.id, context.userId) })
-            .then((u) => (u?.totalTasksCaptured ?? 0) + 1),
+          totalTasksCaptured: (currentUser?.totalTasksCaptured ?? 0) + 1,
           updatedAt: new Date(),
         })
         .where(eq(users.id, context.userId));
@@ -250,33 +249,33 @@ export const updateTask: Tool = {
       const updateData: Record<string, unknown> = { updatedAt: new Date() };
       const previousData: Partial<StoredTaskData> = {};
 
-      if (updates.title !== undefined) {
+      if (updates['title'] !== undefined) {
         previousData.title = currentTask.title;
-        updateData.title = updates.title;
+        updateData['title'] = updates['title'];
       }
-      if (updates.type !== undefined) {
+      if (updates['type'] !== undefined) {
         previousData.type = currentTask.type as any;
-        updateData.type = updates.type;
+        updateData['type'] = updates['type'];
       }
-      if (updates.context !== undefined) {
+      if (updates['context'] !== undefined) {
         previousData.context = currentTask.context;
-        updateData.context = updates.context;
+        updateData['context'] = updates['context'];
       }
-      if (updates.priority !== undefined) {
+      if (updates['priority'] !== undefined) {
         previousData.priority = currentTask.priority;
-        updateData.priority = updates.priority;
+        updateData['priority'] = updates['priority'];
       }
-      if (updates.dueDate !== undefined) {
+      if (updates['dueDate'] !== undefined) {
         previousData.dueDate = currentTask.dueDate;
-        updateData.dueDate = updates.dueDate;
+        updateData['dueDate'] = updates['dueDate'];
       }
-      if (updates.personId !== undefined) {
+      if (updates['personId'] !== undefined) {
         previousData.personId = currentTask.personId;
-        updateData.personId = updates.personId;
+        updateData['personId'] = updates['personId'];
       }
-      if (updates.notes !== undefined) {
+      if (updates['notes'] !== undefined) {
         previousData.notes = currentTask.notes;
-        updateData.notes = updates.notes;
+        updateData['notes'] = updates['notes'];
       }
 
       // Update the task
@@ -360,12 +359,11 @@ export const completeTask: Tool = {
         .returning();
 
       // Update user stats
+      const userForStats = await context.db.query.users.findFirst({ where: eq(users.id, context.userId) });
       await context.db
         .update(users)
         .set({
-          totalTasksCompleted: await context.db.query.users
-            .findFirst({ where: eq(users.id, context.userId) })
-            .then((u) => (u?.totalTasksCompleted ?? 0) + 1),
+          totalTasksCompleted: (userForStats?.totalTasksCompleted ?? 0) + 1,
           updatedAt: new Date(),
         })
         .where(eq(users.id, context.userId));

@@ -82,10 +82,10 @@ export const batchCreateTasks: Tool = {
 
           if (input.personName) {
             const match = userPeople.find(
-              (p) =>
+              (p: typeof userPeople[0]) =>
                 p.name.toLowerCase() === input.personName!.toLowerCase() ||
                 p.aliases?.some(
-                  (a) => a.toLowerCase() === input.personName!.toLowerCase()
+                  (a: string) => a.toLowerCase() === input.personName!.toLowerCase()
                 )
             );
 
@@ -252,7 +252,7 @@ export const batchCompleteTasks: Tool = {
         data: {
           completed: taskIds.length,
           taskIds,
-          titles: userTasks.map((t) => t.title),
+          titles: userTasks.map((t: typeof userTasks[0]) => t.title),
         },
       };
     } catch (error) {
@@ -312,8 +312,8 @@ export const batchDeleteTasks: Tool = {
         success: true,
         data: {
           deleted: userTasks.length,
-          taskIds: userTasks.map((t) => t.id),
-          titles: userTasks.map((t) => t.title),
+          taskIds: userTasks.map((t: typeof userTasks[0]) => t.id),
+          titles: userTasks.map((t: typeof userTasks[0]) => t.title),
         },
       };
     } catch (error) {

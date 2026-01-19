@@ -67,15 +67,17 @@ export interface ToolContext {
 
 /**
  * Notion client interface (subset of what we need)
+ * Using Record<string, any> to allow the actual Notion SDK client type
  */
 export interface NotionClientLike {
   databases: {
-    query: (args: unknown) => Promise<unknown>;
+    query: (...args: any[]) => Promise<any>;
   };
   pages: {
-    create: (args: unknown) => Promise<unknown>;
-    update: (args: unknown) => Promise<unknown>;
+    create: (...args: any[]) => Promise<any>;
+    update: (...args: any[]) => Promise<any>;
   };
+  [key: string]: any;
 }
 
 /**

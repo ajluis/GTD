@@ -139,7 +139,7 @@ export const lookupTasks: Tool = {
       // Date filters
       if (dueToday) {
         const today = new Date();
-        const todayStr = today.toISOString().split('T')[0];
+        const todayStr = today.toISOString().split('T')[0]!;
         conditions.push(eq(tasks.dueDate, todayStr));
       } else {
         if (dueBefore) {
@@ -178,7 +178,7 @@ export const lookupTasks: Tool = {
         },
       });
 
-      const formattedResults = results.map((t, index) => ({
+      const formattedResults = results.map((t: typeof results[0], index: number) => ({
         id: t.id,
         index: index + 1, // 1-based for "the first one"
         title: t.title,
@@ -199,7 +199,7 @@ export const lookupTasks: Tool = {
           tasks: formattedResults,
         },
         trackEntities: {
-          tasks: formattedResults.map((t) => ({
+          tasks: formattedResults.map((t: typeof formattedResults[0]) => ({
             id: t.id,
             title: t.title,
             type: t.type as any,
@@ -238,7 +238,7 @@ export const lookupTodayTasks: Tool = {
 
     try {
       const today = new Date();
-      const todayStr = today.toISOString().split('T')[0];
+      const todayStr = today.toISOString().split('T')[0]!;
 
       const conditions = [
         eq(tasks.userId, context.userId),
@@ -263,7 +263,7 @@ export const lookupTodayTasks: Tool = {
         limit: 50,
       });
 
-      const formattedResults = results.map((t, index) => ({
+      const formattedResults = results.map((t: typeof results[0], index: number) => ({
         id: t.id,
         index: index + 1,
         title: t.title,
@@ -271,7 +271,7 @@ export const lookupTodayTasks: Tool = {
         context: t.context,
         priority: t.priority,
         dueDate: t.dueDate,
-        isOverdue: t.dueDate ? t.dueDate < todayStr : false,
+        isOverdue: t.dueDate && todayStr ? t.dueDate < todayStr : false,
       }));
 
       return {
@@ -282,7 +282,7 @@ export const lookupTodayTasks: Tool = {
           tasks: formattedResults,
         },
         trackEntities: {
-          tasks: formattedResults.map((t) => ({
+          tasks: formattedResults.map((t: typeof formattedResults[0]) => ({
             id: t.id,
             title: t.title,
             type: t.type as any,

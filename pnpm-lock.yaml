@@ -155,9 +155,15 @@ importers:
       '@google/generative-ai':
         specifier: ^0.21.0
         version: 0.21.0
+      '@gtd/database':
+        specifier: workspace:*
+        version: link:../database
       '@gtd/shared-types':
         specifier: workspace:*
         version: link:../shared-types
+      drizzle-orm:
+        specifier: ^0.38.3
+        version: 0.38.4(postgres@3.4.8)
     devDependencies:
       typescript:
         specifier: ^5.3.3
