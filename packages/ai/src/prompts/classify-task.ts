@@ -13,6 +13,22 @@ export interface ConversationMessage {
 }
 
 /**
+ * Recent task for context - helps LLM understand what tasks exist
+ */
+export interface RecentTaskContext {
+  /** Task title */
+  title: string;
+  /** Task type (action, waiting, project, etc.) */
+  type: string;
+  /** Due date if set (YYYY-MM-DD) */
+  dueDate?: string | null;
+  /** Person name if associated */
+  personName?: string | null;
+  /** Priority (today, this_week, soon) */
+  priority?: string | null;
+}
+
+/**
  * Build the GTD classification prompt for Gemini
  *
  * This prompt instructs Gemini to:
@@ -28,7 +44,8 @@ export function buildClassificationPrompt(
   currentTime: Date,
   conversationHistory: ConversationMessage[] = [],
   mode: 'classify' | 'extract' = 'classify',
-  timezone: string = 'America/New_York'
+  timezone: string = 'America/New_York',
+  recentTasks: RecentTaskContext[] = []
 ): string {
   const peopleList =
     people.length > 0
@@ -68,6 +85,19 @@ export function buildClassificationPrompt(
         .join('\n')
     : '(No recent conversation)';
 
+  // Format recent tasks for context (so LLM knows what tasks exist)
+  const recentTasksList = recentTasks.length > 0
+    ? recentTasks
+        .map((t) => {
+          let line = `- "${t.title}" (${t.type})`;
+          if (t.personName) line += ` [person: ${t.personName}]`;
+          if (t.dueDate) line += ` [due: ${t.dueDate}]`;
+          else if (t.priority) line += ` [priority: ${t.priority}]`;
+          return line;
+        })
+        .join('\n')
+    : '(No recent tasks)';
+
   return `You are a GTD (Getting Things Done) assistant that helps users via SMS.
 
 CURRENT CONTEXT:
@@ -79,6 +109,9 @@ ${peopleList}
 
 RECENT CONVERSATION (use for context when user says "that", "it", "the first one", etc.):
 ${conversationContext}
+
+USER'S RECENT TASKS (use to answer questions about existing tasks):
+${recentTasksList}
 
 ═══════════════════════════════════════════════════════════════
 CLASSIFICATION RULES - Follow this decision tree:
@@ -105,6 +138,12 @@ INTENT DETECTION (check FIRST)
    │ "who do I meet with", "my people", "show contacts" → query_people
    │ "what's on my plate for [person]", "[person]'s agenda" → query_person_agenda
    │ "help", "what can you do", "commands" → show_help
+   │
+   │ TASK-SPECIFIC QUERIES (asking about an existing task):
+   │ "when is [task] due", "what's the deadline for [task]" → query_specific_task
+   │ "when does [person] owe me [thing]" → query_specific_task
+   │ "what's the status of [task]" → query_specific_task
+   │ "show me the [task] task" → query_specific_task
    └─────────────────────────────────────────────────────────────
 
 2. COMPLETION INTENTS - User wants to MARK something done

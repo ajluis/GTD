@@ -14,6 +14,7 @@ import {
   handleQueryContext,
   handleQueryPeople,
   handleQueryPersonAgenda,
+  handleQuerySpecificTask,
   handleShowWeeklyReview,
 } from './queries.js';
 import {
@@ -113,6 +114,8 @@ export async function handleIntent(
         return handleQueryPeople(ctx);
       case 'query_person_agenda':
         return handleQueryPersonAgenda(intent.entities, ctx);
+      case 'query_specific_task':
+        return handleQuerySpecificTask(intent.entities, ctx);
 
       // Completion intents
       case 'complete_task':

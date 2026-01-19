@@ -5,7 +5,7 @@ import type { Queue } from 'bullmq';
 import type { DbClient } from '@gtd/database';
 import { users, messages, tasks, people, conversationStates } from '@gtd/database';
 import { eq, desc, and } from 'drizzle-orm';
-import { createClassifier, findBestFuzzyMatch, formatDidYouMean, type ConversationMessage } from '@gtd/ai';
+import { createClassifier, findBestFuzzyMatch, formatDidYouMean, type ConversationMessage, type RecentTaskContext } from '@gtd/ai';
 import {
   createNotionClient,
   createPerson as createNotionPerson,
@@ -182,30 +182,51 @@ export function createClassifyProcessor(
       }
     }
 
-    // 4. Fetch recent conversation history for context
+    // 4. Fetch recent conversation history for context (expanded from 6 to 20)
     const recentMessages = await db.query.messages.findMany({
       where: eq(messages.userId, userId),
       orderBy: [desc(messages.createdAt)],
-      limit: 10, // Fetch last 10 messages (will use 6 most recent)
+      limit: 25, // Fetch last 25 messages (will use 20 most recent)
     });
 
     // Convert to ConversationMessage format (oldest first for context)
     const conversationHistory: ConversationMessage[] = recentMessages
       .reverse() // Oldest first
+      .slice(-20) // Keep last 20 messages for better context
       .map((msg) => ({
         role: msg.direction === 'inbound' ? 'user' as const : 'assistant' as const,
         content: msg.content,
         timestamp: msg.createdAt,
       }));
 
-    // 5. Classify with Gemini (with conversation history)
+    // 4b. Fetch recent tasks for context (so LLM knows what tasks exist)
+    const recentUserTasks = await db.query.tasks.findMany({
+      where: eq(tasks.userId, userId),
+      orderBy: [desc(tasks.createdAt)],
+      limit: 20, // Last 20 tasks
+    });
+
+    // Build task context with person names
+    const recentTasksContext: RecentTaskContext[] = recentUserTasks.map((t) => {
+      const person = t.personId ? userPeople.find((p) => p.id === t.personId) : null;
+      return {
+        title: t.title,
+        type: t.type,
+        dueDate: t.dueDate,
+        personName: person?.name ?? null,
+        priority: t.priority,
+      };
+    });
+
+    // 5. Classify with Gemini (with conversation history and task context)
     const classification = await classifier.classify(
       content,
       peopleForMatching,
       new Date(), // currentTime
       conversationHistory,
       'classify',
-      user.timezone // Use user's timezone for date calculations
+      user.timezone, // Use user's timezone for date calculations
+      recentTasksContext // Pass recent tasks so LLM can answer questions about them
     );
 
     console.log(`[Classify] Result: ${classification.type} (${classification.confidence})`);

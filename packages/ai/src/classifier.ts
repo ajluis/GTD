@@ -10,6 +10,7 @@ import {
   buildClassificationPrompt,
   CLASSIFIER_SYSTEM_PROMPT,
   type ConversationMessage,
+  type RecentTaskContext,
 } from './prompts/classify-task.js';
 
 /**
@@ -35,6 +36,7 @@ export class GTDClassifier {
    * @param conversationHistory - Recent conversation messages for context (optional)
    * @param mode - 'classify' (default) or 'extract' (for re-classification after clarification)
    * @param timezone - User's timezone for date calculations (default: America/New_York)
+   * @param recentTasks - User's recent tasks for context (helps answer questions about existing tasks)
    * @returns Classification result with type, intent, or task details
    */
   async classify(
@@ -43,9 +45,10 @@ export class GTDClassifier {
     currentTime: Date = new Date(),
     conversationHistory: ConversationMessage[] = [],
     mode: 'classify' | 'extract' = 'classify',
-    timezone: string = 'America/New_York'
+    timezone: string = 'America/New_York',
+    recentTasks: RecentTaskContext[] = []
   ): Promise<ClassificationResult> {
-    const prompt = buildClassificationPrompt(message, people, currentTime, conversationHistory, mode, timezone);
+    const prompt = buildClassificationPrompt(message, people, currentTime, conversationHistory, mode, timezone, recentTasks);
 
     try {
       const result = await this.gemini.generateJSON<RawClassificationResult>(
@@ -314,6 +317,7 @@ const VALID_INTENTS: IntentType[] = [
   'query_context',
   'query_people',
   'query_person_agenda',
+  'query_specific_task',
   // Completion
   'complete_task',
   'complete_recent',

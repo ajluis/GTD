@@ -1,5 +1,5 @@
-import { people } from '@gtd/database';
-import { eq } from 'drizzle-orm';
+import { people, tasks } from '@gtd/database';
+import { eq, desc, ilike, or } from 'drizzle-orm';
 import {
   createNotionClient,
   queryTasksDueToday,
@@ -13,6 +13,7 @@ import {
   queryTasksDueInRange,
   extractTaskTitle,
   extractTaskDueDate,
+  findTaskByText,
 } from '@gtd/notion';
 import { formatTaskList, formatHelp } from '@gtd/gtd';
 import type { IntentEntities } from '@gtd/shared-types';
@@ -437,4 +438,107 @@ export async function handleShowWeeklyReview(ctx: HandlerContext): Promise<strin
     console.error('[Query:weekly_review] Error:', error);
     return "📋 WEEKLY REVIEW:\nCouldn't fetch data. Try again later.";
   }
+}
+
+/**
+ * Handle query_specific_task intent
+ * "when is [task] due", "what's the status of [task]", "when does [person] owe me [thing]"
+ */
+export async function handleQuerySpecificTask(
+  entities: IntentEntities,
+  ctx: HandlerContext
+): Promise<string> {
+  const searchText = entities.taskText;
+  const personName = entities.personName;
+
+  if (!searchText && !personName) {
+    return "Which task would you like to know about? Try describing it.";
+  }
+
+  // First, try to find in local database (includes person join)
+  const userTasks = await ctx.db.query.tasks.findMany({
+    where: eq(tasks.userId, ctx.user.id),
+    orderBy: [desc(tasks.createdAt)],
+    limit: 50,
+  });
+
+  // Get all people for name matching
+  const userPeople = await ctx.db.query.people.findMany({
+    where: eq(people.userId, ctx.user.id),
+  });
+
+  // Find matching tasks
+  let matchingTasks = userTasks;
+
+  // Filter by person if mentioned
+  if (personName) {
+    const person = userPeople.find(
+      (p) =>
+        p.name.toLowerCase().includes(personName.toLowerCase()) ||
+        p.aliases?.some((a) => a.toLowerCase().includes(personName.toLowerCase()))
+    );
+
+    if (person) {
+      matchingTasks = matchingTasks.filter((t) => t.personId === person.id);
+    } else {
+      // Try to match person name in task title
+      matchingTasks = matchingTasks.filter((t) =>
+        t.title.toLowerCase().includes(personName.toLowerCase())
+      );
+    }
+  }
+
+  // Filter by task text if provided
+  if (searchText) {
+    const searchLower = searchText.toLowerCase();
+    matchingTasks = matchingTasks.filter((t) =>
+      t.title.toLowerCase().includes(searchLower) ||
+      t.rawText?.toLowerCase().includes(searchLower)
+    );
+  }
+
+  if (matchingTasks.length === 0) {
+    const searchDesc = personName && searchText
+      ? `"${searchText}" for ${personName}`
+      : searchText || personName;
+    return `I couldn't find a task matching "${searchDesc}".\n\nTry checking your task lists with "today", "waiting", or "actions".`;
+  }
+
+  // If exactly one match, show details
+  if (matchingTasks.length === 1) {
+    const task = matchingTasks[0]!;
+    const person = task.personId ? userPeople.find((p) => p.id === task.personId) : null;
+
+    const lines: string[] = [];
+    const typeEmoji = task.type === 'waiting' ? '⏳' : task.type === 'action' ? '✅' : task.type === 'project' ? '📁' : '📋';
+    lines.push(`${typeEmoji} ${task.title}`);
+    lines.push('');
+
+    if (task.type) lines.push(`Type: ${task.type}`);
+    if (person) lines.push(`Person: ${person.name}`);
+    if (task.dueDate) {
+      lines.push(`Due: ${task.dueDate}`);
+    } else if (task.priority) {
+      lines.push(`Priority: ${task.priority}`);
+    } else {
+      lines.push(`Due: Not set`);
+    }
+    if (task.context) lines.push(`Context: @${task.context}`);
+    if (task.status) lines.push(`Status: ${task.status}`);
+
+    return lines.join('\n');
+  }
+
+  // Multiple matches - show list
+  const formatted = matchingTasks.slice(0, 5).map((t) => {
+    const person = t.personId ? userPeople.find((p) => p.id === t.personId) : null;
+    let detail = '';
+    if (t.dueDate) detail = `due ${t.dueDate}`;
+    else if (t.priority) detail = t.priority;
+    if (person) detail = detail ? `${person.name}, ${detail}` : person.name;
+    return `• ${t.title}${detail ? ` (${detail})` : ''}`;
+  });
+
+  const suffix = matchingTasks.length > 5 ? `\n\n(+${matchingTasks.length - 5} more)` : '';
+  return `Found ${matchingTasks.length} matching tasks:\n${formatted.join('\n')}${suffix}\n\nBe more specific to see details.`;
 }

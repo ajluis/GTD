@@ -160,6 +160,7 @@ export type IntentType =
   | 'query_context'
   | 'query_people'
   | 'query_person_agenda'
+  | 'query_specific_task'
   // Task completion - user wants to MARK something done
   | 'complete_task'
   | 'complete_recent'
