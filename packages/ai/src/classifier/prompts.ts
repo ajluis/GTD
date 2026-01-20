@@ -32,6 +32,10 @@ CLASSIFICATION TYPES
    - Edits: "change X to Y", "move to tomorrow"
    - Settings: "set timezone", "pause notifications"
 
+   SETTINGS TERMINOLOGY:
+   - "daily digest" / "daily review" / "morning summary" → set_digest_time
+   - "weekly review" → set_review_time or set_review_day
+
 4. "needs_clarification" - Too vague to process
    - No deadline when one seems needed
    - Ambiguous task description
