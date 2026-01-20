@@ -1,5 +1,5 @@
 {
-  "name": "@gtd/ai",
+  "name": "@gtd/mcp",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -18,14 +18,10 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@gtd/database": "workspace:*",
-    "@gtd/shared-types": "workspace:*",
-    "@gtd/context": "workspace:*",
-    "@gtd/memory": "workspace:*",
-    "@google/generative-ai": "^0.21.0",
-    "drizzle-orm": "^0.38.3"
+    "@modelcontextprotocol/sdk": "^1.0.0"
   },
   "devDependencies": {
+    "@types/node": "^20.10.0",
     "typescript": "^5.3.3"
   }
 }

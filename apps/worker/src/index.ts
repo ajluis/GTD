@@ -7,7 +7,7 @@ import {
   type MessageJobData,
 } from '@gtd/queue';
 import { createInboundProcessor } from './processors/inbound.js';
-import { createHybridClassifyProcessor } from './processors/classify-hybrid.js';
+import { createUnifiedClassifyProcessor } from './processors/classify-unified.js';
 import { createTodoistSyncProcessor } from './processors/todoist-sync.js';
 import { createOutboundProcessor } from './processors/outbound.js';
 
@@ -55,7 +55,7 @@ async function main() {
 
   // Create processors
   const inboundProcessor = createInboundProcessor(db, messageQueue, config.appUrl);
-  const classifyProcessor = createHybridClassifyProcessor(db, messageQueue);
+  const classifyProcessor = createUnifiedClassifyProcessor(db, messageQueue);
   const todoistSyncProcessor = createTodoistSyncProcessor(db);
   const outboundProcessor = createOutboundProcessor(db);
 
