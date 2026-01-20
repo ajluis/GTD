@@ -44,7 +44,7 @@ export const lookupPeople: Tool = {
         aliases: string[] | null;
         frequency: string | null;
         dayOfWeek: string | null;
-        notionPageId: string | null;
+        todoistLabel: string | null;
       }>;
 
       if (query) {
@@ -107,7 +107,7 @@ export const lookupPeople: Tool = {
         aliases: p.aliases ?? [],
         frequency: p.frequency,
         dayOfWeek: p.dayOfWeek,
-        notionPageId: p.notionPageId,
+        todoistLabel: p.todoistLabel,
       }));
 
       return {

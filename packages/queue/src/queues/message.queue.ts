@@ -4,7 +4,7 @@ import {
   type MessageJobData,
   type InboundMessageJobData,
   type ClassifyJobData,
-  type NotionSyncJobData,
+  type TodoistSyncJobData,
   type OutboundMessageJobData,
 } from '../types/jobs.js';
 
@@ -73,18 +73,19 @@ export async function enqueueClassification(
 }
 
 /**
- * Helper: Enqueue task for Notion sync
+ * Helper: Enqueue task for Todoist sync
+ * This is the primary sync destination (replacing Notion)
  */
-export async function enqueueNotionSync(
+export async function enqueueTodoistSync(
   queue: Queue<MessageJobData>,
-  data: Omit<NotionSyncJobData, 'type'>
+  data: Omit<TodoistSyncJobData, 'type'>
 ): Promise<string> {
   const job = await queue.add(
-    'notion-sync',
-    { type: 'notion-sync', ...data },
+    'todoist-sync',
+    { type: 'todoist-sync', ...data },
     {
-      jobId: `notion-sync-${data.taskId}`,
-      attempts: 5, // More retries for Notion API
+      jobId: `todoist-sync-${data.taskId}`,
+      attempts: 5, // More retries for API calls
       backoff: {
         type: 'exponential',
         delay: 3000, // 3s -> 6s -> 12s -> 24s -> 48s

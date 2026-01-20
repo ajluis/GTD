@@ -54,11 +54,8 @@ export interface ToolContext {
   userId: string;
   /** Database client */
   db: DbClient;
-  /** Notion client (if user has connected Notion) */
-  notionClient: NotionClientLike | null;
-  /** Notion database IDs */
-  notionTasksDatabaseId: string | null;
-  notionPeopleDatabaseId: string | null;
+  /** Todoist client (if user has connected Todoist) */
+  todoistClient: TodoistClientLike | null;
   /** User's timezone */
   timezone: string;
   /** Conversation context for follow-ups */
@@ -66,17 +63,14 @@ export interface ToolContext {
 }
 
 /**
- * Notion client interface (subset of what we need)
- * Using Record<string, any> to allow the actual Notion SDK client type
+ * Todoist client interface (subset of what we need)
+ * Using Record<string, any> to allow the actual Todoist client type
  */
-export interface NotionClientLike {
-  databases: {
-    query: (...args: any[]) => Promise<any>;
-  };
-  pages: {
-    create: (...args: any[]) => Promise<any>;
-    update: (...args: any[]) => Promise<any>;
-  };
+export interface TodoistClientLike {
+  get: <T>(endpoint: string) => Promise<T>;
+  post: <T>(endpoint: string, data: unknown) => Promise<T>;
+  update: <T>(endpoint: string, data: unknown) => Promise<T>;
+  delete: (endpoint: string) => Promise<void>;
   [key: string]: any;
 }
 
@@ -152,10 +146,10 @@ export interface ConversationContext {
  * Undo action types
  */
 export type UndoAction =
-  | { type: 'delete_created_task'; taskId: string; notionPageId?: string }
+  | { type: 'delete_created_task'; taskId: string; todoistTaskId?: string }
   | { type: 'restore_deleted_task'; taskData: StoredTaskData }
   | { type: 'revert_task_update'; taskId: string; previousData: Partial<StoredTaskData> }
-  | { type: 'uncomplete_task'; taskId: string; notionPageId?: string }
+  | { type: 'uncomplete_task'; taskId: string; todoistTaskId?: string }
   | { type: 'restore_person'; personData: StoredPersonData };
 
 /**
@@ -171,7 +165,7 @@ export interface StoredTaskData {
   dueDate: string | null;
   personId: string | null;
   notes: string | null;
-  notionPageId: string | null;
+  todoistTaskId: string | null;
 }
 
 /**
@@ -183,7 +177,7 @@ export interface StoredPersonData {
   aliases: string[] | null;
   frequency: MeetingFrequency | null;
   dayOfWeek: DayOfWeek | null;
-  notionPageId: string | null;
+  todoistLabel: string | null;
 }
 
 /**
@@ -221,6 +215,8 @@ export interface FastClassifyResult {
     priority?: TaskPriority;
     dueDate?: string;
     personName?: string; // Raw name, will be resolved later
+    /** Target Todoist project (AI-selected from available projects) */
+    targetProject?: string;
   };
 
   /** For multi-item messages */
@@ -231,6 +227,8 @@ export interface FastClassifyResult {
     priority?: TaskPriority;
     dueDate?: string;
     personName?: string;
+    /** Target Todoist project (AI-selected from available projects) */
+    targetProject?: string;
     needsClarification?: boolean;
     clarificationQuestion?: string;
   }>;

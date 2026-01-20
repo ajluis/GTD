@@ -1,6 +1,6 @@
 import { people } from '@gtd/database';
 import { eq } from 'drizzle-orm';
-import { createNotionClient, createPerson as createNotionPerson } from '@gtd/notion';
+import { ensurePersonLabel, createTodoistClient } from '@gtd/todoist';
 import type { IntentEntities, MeetingFrequency, DayOfWeek } from '@gtd/shared-types';
 import type { HandlerContext } from './intents.js';
 
@@ -30,18 +30,16 @@ export async function handleAddPerson(
     return `👤 ${personName} is already in your people list.`;
   }
 
-  // Create in Notion if configured
-  let notionPageId: string | null = null;
-  if (ctx.user.notionAccessToken && ctx.user.notionPeopleDatabaseId) {
+  // Create person label in Todoist if connected
+  let todoistLabel: string | null = null;
+  if (ctx.user.todoistAccessToken) {
     try {
-      console.log(`[AddPerson] Creating ${personName} in Notion...`);
-      const notion = createNotionClient(ctx.user.notionAccessToken);
-      notionPageId = await createNotionPerson(notion, ctx.user.notionPeopleDatabaseId, {
-        name: personName,
-      });
-      console.log(`[AddPerson] Created Notion page: ${notionPageId}`);
+      console.log(`[AddPerson] Creating label for ${personName} in Todoist...`);
+      const todoist = createTodoistClient(ctx.user.todoistAccessToken);
+      todoistLabel = await ensurePersonLabel(todoist, personName);
+      console.log(`[AddPerson] Created Todoist label: ${todoistLabel}`);
     } catch (error) {
-      console.error(`[AddPerson] Failed to create in Notion:`, error);
+      console.error(`[AddPerson] Failed to create Todoist label:`, error);
       // Continue anyway - save locally
     }
   }
@@ -50,11 +48,11 @@ export async function handleAddPerson(
   await ctx.db.insert(people).values({
     userId: ctx.user.id,
     name: personName,
-    notionPageId,
+    todoistLabel,
     active: true,
   });
 
-  const syncNote = notionPageId ? ' (synced to Notion)' : '';
+  const syncNote = todoistLabel ? ' (synced to Todoist)' : '';
   return `✅ Added ${personName} to your people.${syncNote}\n\nOptional next steps:\n• "${personName} goes by [nickname]" to add an alias\n• "${personName} meets weekly on Tuesday" to set schedule`;
 }
 

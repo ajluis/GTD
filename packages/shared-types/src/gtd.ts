@@ -68,6 +68,12 @@ export interface ClassificationResult {
   /** Parsed due date (ISO format) */
   dueDate?: string;
 
+  /**
+   * Target Todoist project name (AI-selected from available projects)
+   * Used by Todoist sync to route task to the appropriate project
+   */
+  targetProject?: string;
+
   /** Classification confidence (0-1) */
   confidence: number;
 

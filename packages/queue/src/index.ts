@@ -6,7 +6,7 @@ export {
   createMessageQueue,
   enqueueInboundMessage,
   enqueueClassification,
-  enqueueNotionSync,
+  enqueueTodoistSync,
   enqueueOutboundMessage,
 } from './queues/message.queue.js';
 

@@ -120,6 +120,32 @@ Context inference:
 - chores/clean/fix at home → home
 
 ═══════════════════════════════════════════════════════════════
+PROJECT ROUTING (Dynamic)
+═══════════════════════════════════════════════════════════════
+
+When AVAILABLE_PROJECTS is provided, route tasks to the most appropriate project:
+
+ROUTING RULES:
+- Match task content to project names semantically
+- Code/bugs/features/technical → look for Engineering/Dev/Tech projects
+- Customers/support/tickets → look for CS/Support/Customer projects
+- Sales/leads/deals → look for Sales/BD projects
+- Marketing/campaigns → look for Marketing projects
+- Personal/life tasks → look for Personal project or Inbox
+- If uncertain → route to Inbox (default)
+
+SHORTCUTS (explicit overrides, case-insensitive):
+- #projectname at start or end → force route to that project
+- #inbox → explicitly route to Inbox
+- #someday → route to Someday/Maybe project
+
+Examples:
+- "Fix login bug" with projects [Work, Engineering] → targetProject: "Engineering"
+- "#Sales Follow up with lead" → targetProject: "Sales"
+- "Buy groceries" with projects [Work, Personal] → targetProject: "Personal"
+- "Random thought #someday" → type: "someday", targetProject: "Someday" (if exists)
+
+═══════════════════════════════════════════════════════════════
 OUTPUT FORMAT
 ═══════════════════════════════════════════════════════════════
 
@@ -136,7 +162,8 @@ For SINGLE TASK:
     "context": "computer|phone|home|outside",
     "priority": "today|this_week|soon",
     "dueDate": "YYYY-MM-DD",
-    "personName": "Name if mentioned"
+    "personName": "Name if mentioned",
+    "targetProject": "ProjectName from available list"
   }
 }
 
@@ -146,8 +173,8 @@ For MULTI-ITEM:
   "needsDataLookup": false,
   "confidence": 0.85,
   "items": [
-    { "title": "...", "type": "action", "context": "phone" },
-    { "title": "...", "type": "waiting", "personName": "John" }
+    { "title": "...", "type": "action", "context": "phone", "targetProject": "..." },
+    { "title": "...", "type": "waiting", "personName": "John", "targetProject": "..." }
   ]
 }
 
@@ -185,7 +212,8 @@ export function buildFastClassifyPrompt(
   message: string,
   timezone: string,
   currentTime: Date,
-  recentMessages?: Array<{ role: string; content: string }>
+  recentMessages?: Array<{ role: string; content: string }>,
+  availableProjects?: string[]
 ): string {
   // Format date in user's timezone
   const dayOfWeek = currentTime.toLocaleDateString('en-US', {
@@ -209,10 +237,17 @@ export function buildFastClassifyPrompt(
 ${recentMessages.map((m) => `[${m.role.toUpperCase()}]: ${m.content}`).join('\n')}`
     : '';
 
+  // Format available projects for routing
+  const projectsSection = availableProjects && availableProjects.length > 0
+    ? `\nAVAILABLE_PROJECTS for routing: [${availableProjects.join(', ')}]
+Route tasks to the most appropriate project from this list. Use "Inbox" if uncertain.`
+    : '';
+
   return `CURRENT CONTEXT:
 - Today: ${dateString} (${isoDate}), ${dayOfWeek}
 - Timezone: ${timezone}
 ${contextSection}
+${projectsSection}
 
 MESSAGE TO CLASSIFY:
 "${message}"`;

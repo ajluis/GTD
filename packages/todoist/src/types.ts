@@ -4,13 +4,11 @@
 export interface CreateTaskData {
   content: string;
   description?: string;
-  projectId?: string;
   project_id?: string; // Todoist API uses snake_case
   labels?: string[];
   priority?: 1 | 2 | 3 | 4; // 4 = urgent, 1 = normal
-  dueString?: string;
-  dueDate?: string;
-  due_date?: string; // Todoist API uses snake_case
+  due_string?: string; // Natural language like "tomorrow"
+  due_date?: string; // ISO date like "2024-01-15"
 }
 
 /**
@@ -40,7 +38,11 @@ export interface TodoistProject {
   id: string;
   name: string;
   color: string;
-  isInboxProject: boolean;
+  /** Whether this is the user's Inbox project */
+  isInboxProject?: boolean;
+  is_inbox_project?: boolean; // API returns snake_case
+  /** Parent project ID (for nested projects) */
+  parent_id?: string | null;
 }
 
 /**

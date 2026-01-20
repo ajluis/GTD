@@ -1,17 +1,17 @@
 # GTD - Project Context
 
-> A GTD (Getting Things Done) assistant that works via SMS, using AI to classify messages and sync tasks to Notion.
+> A GTD (Getting Things Done) assistant that works via SMS, using AI to classify messages and sync tasks to Todoist.
 
 **IMPORTANT:** Update this file before every `git push` to keep context current for future sessions.
 
 ## Overview
 
-GTD is an SMS-based task management system. Users text tasks to a phone number, and an AI (Gemini) classifies them into GTD categories, then syncs them to the user's Notion workspace.
+GTD is an SMS-based task management system. Users text tasks to a phone number, and an AI (Gemini) classifies them into GTD categories, then syncs them to Todoist via the REST API.
 
 **Core Flow:**
 ```
 User texts SMS → Sendblue webhook → Redis queue → Worker classifies with Gemini AI →
-Creates task in PostgreSQL → Syncs to Notion → Sends confirmation SMS back
+Creates task in PostgreSQL → Syncs to Todoist → Sends confirmation SMS back
 ```
 
 ## Tech Stack
@@ -25,7 +25,7 @@ Creates task in PostgreSQL → Syncs to Notion → Sends confirmation SMS back
 | Database | PostgreSQL + Drizzle ORM |
 | AI | Google Gemini (via @google/generative-ai) |
 | SMS | Sendblue API |
-| Tasks | Notion API |
+| Tasks | Todoist REST API |
 | Deployment | Railway |
 
 ## Directory Structure
@@ -33,18 +33,17 @@ Creates task in PostgreSQL → Syncs to Notion → Sends confirmation SMS back
 ```
 /Users/aluis/GTD/
 ├── apps/
-│   ├── api/              # Fastify API server (webhooks, OAuth)
+│   ├── api/              # Fastify API server (webhooks)
 │   ├── worker/           # BullMQ job processor (classification, sync)
-│   └── scheduler/        # Cron jobs (daily digest, reminders) [NEW]
+│   └── scheduler/        # Cron jobs (daily digest, reminders)
 ├── packages/
-│   ├── ai/               # Gemini AI classifier + fuzzy matching
+│   ├── ai/               # Gemini AI classifier + LLM tools
 │   ├── database/         # Drizzle schema + client
 │   ├── gtd/              # GTD formatters + command parsing
-│   ├── notion/           # Notion API client + task operations
+│   ├── todoist/          # Todoist REST API client + task operations
 │   ├── queue/            # BullMQ queue definitions
 │   ├── sendblue/         # Sendblue SMS client
-│   ├── shared-types/     # TypeScript types shared across packages
-│   └── todoist/          # (Legacy - not actively used)
+│   └── shared-types/     # TypeScript types shared across packages
 ├── Dockerfile            # Multi-stage Docker build
 ├── Dockerfile.worker     # Worker-specific Dockerfile for Railway
 └── turbo.json            # Turborepo config
@@ -64,19 +63,30 @@ Creates task in PostgreSQL → Syncs to Notion → Sends confirmation SMS back
 
 ### Message Processing
 - `apps/worker/src/processors/classify.ts` - Main message processor (fetches conversation history)
-- `apps/worker/src/handlers/intents.ts` - Intent router (35+ intent types)
-- `apps/worker/src/handlers/queries.ts` - Query handlers (today, actions, etc.)
+- `apps/worker/src/handlers/intents.ts` - Intent router (35+ intent types) + HandlerContext interface
+- `apps/worker/src/handlers/queries.ts` - Query handlers (today, actions, etc.) - uses Todoist queries
 - `apps/worker/src/handlers/settings.ts` - Settings handlers (timezone, digest)
-- `apps/worker/src/handlers/editing.ts` - Task editing (reschedule, rename, etc.)
+- `apps/worker/src/handlers/editing.ts` - Task editing (reschedule, rename, etc.) - uses Todoist API
 - `apps/worker/src/handlers/people.ts` - People management (add, remove, alias)
-- `apps/worker/src/handlers/completion.ts` - Task completion handlers
+- `apps/worker/src/handlers/completion.ts` - Task completion handlers - uses Todoist completeTask
 
-### Notion Integration
-- `packages/notion/src/services/tasks.ts` - Task CRUD + queries
-- `packages/notion/src/services/setup.ts` - Database creation during onboarding
+### Todoist Integration
+- `packages/todoist/src/client.ts` - REST API client with get/post/update/delete methods
+- `packages/todoist/src/services/tasks.ts` - Task CRUD + queries (createTask, completeTask, updateTask, deleteTask)
+- `packages/todoist/src/services/projects.ts` - Project queries (getProjects, findProject)
+- `packages/todoist/src/services/queries.ts` - Filter-based queries:
+  - `queryDueToday()` - Tasks due today
+  - `queryByLabel(label)` - Tasks with specific label
+  - `queryByContext(context)` - Tasks by GTD context label
+  - `queryWaiting()` - Waiting tasks (by label)
+  - `queryOverdueWaiting()` - Overdue waiting items
+  - `queryHighPriority()` - p1/p2 priority tasks
+  - `queryPersonAgenda(personLabel)` - Person's agenda items
+  - `queryDueThisWeek()` - Tasks due within 7 days
+  - `searchTasks(searchText)` - Full-text search
 
 ### Database Schema
-- `packages/database/src/schema/users.ts` - User accounts + Notion credentials
+- `packages/database/src/schema/users.ts` - User accounts + Todoist credentials
 - `packages/database/src/schema/tasks.ts` - Local task records
 - `packages/database/src/schema/people.ts` - People for agenda items
 - `packages/database/src/schema/messages.ts` - SMS history (used for conversation context)
@@ -88,9 +98,14 @@ Creates task in PostgreSQL → Syncs to Notion → Sends confirmation SMS back
 ```sql
 - id (uuid, PK)
 - phone_number (text, unique) -- E.164 format: +15551234567
+-- Todoist Integration
+- todoist_access_token (text)
+- todoist_user_id (text)
+-- Legacy Notion fields (kept for migration, not actively used)
 - notion_access_token (text)
 - notion_tasks_database_id (text)
 - notion_people_database_id (text)
+-- Preferences
 - timezone (text, default: 'America/New_York')
 - digest_time (text, default: '08:00')
 - meeting_reminder_hours (int, default: 2)
@@ -112,7 +127,8 @@ Creates task in PostgreSQL → Syncs to Notion → Sends confirmation SMS back
 - context (enum: 'computer', 'phone', 'home', 'outside')
 - priority (enum: 'today', 'this_week', 'soon')
 - person_id (uuid, FK → people)
-- notion_page_id (text) -- After sync
+- todoist_task_id (text, unique) -- Todoist task ID after sync
+- notion_page_id (text) -- Legacy, kept for migration
 - due_date (text) -- ISO format
 ```
 
@@ -124,7 +140,8 @@ Creates task in PostgreSQL → Syncs to Notion → Sends confirmation SMS back
 - aliases (text[]) -- Alternative names
 - frequency (enum: 'daily', 'weekly', 'biweekly', 'monthly', 'as_needed')
 - day_of_week (enum: 'monday'...'sunday')
-- notion_page_id (text) -- Synced to Notion People database
+- todoist_label (text) -- Todoist label for this person's agenda items
+- notion_page_id (text) -- Legacy, kept for migration
 - active (boolean)
 ```
 
@@ -200,30 +217,31 @@ The AI receives the last 6 messages for context resolution:
 - Example: User asks "what's on my plate today?" → sees "Call Rob" → says "finished that"
   → AI sees the previous exchange and returns `complete_task` with `taskText: "Call Rob"`
 
-## Notion Database Structure
+## Todoist Structure
 
-The system auto-creates two databases during onboarding:
+Tasks are organized in Todoist using:
 
-### Tasks Database
-| Property | Type | Values |
-|----------|------|--------|
-| Task | title | Task name |
-| Type | select | Action, Project, Waiting, Someday, Agenda |
-| Status | select | To Do, Done, Discussed |
-| Context | select | @computer, @phone, @home, @outside |
-| Priority | select | 🔥 Today, 📅 This Week, 🔜 Soon |
-| Due | date | Due date |
-| Person | relation | → People database |
-| Notes | rich_text | Additional notes |
-| Created | date | When captured |
-| Completed | date | When marked done |
+### Labels (for GTD metadata)
+| Label | Purpose |
+|-------|---------|
+| `gtd_action` | Next actions |
+| `gtd_project` | Multi-step projects |
+| `gtd_waiting` | Waiting for items |
+| `gtd_someday` | Someday/maybe items |
+| `gtd_agenda` | Agenda items |
+| `@computer` / `@phone` / `@home` / `@outside` | Context labels |
+| `Person: John` | Person-specific labels for agenda items |
 
-### People Database
-| Property | Type |
-|----------|------|
-| Name | title |
-| Frequency | select |
-| Day | select |
+### Priority Mapping
+| GTD Priority | Todoist Priority |
+|--------------|------------------|
+| today | p1 (highest) |
+| this_week | p2 |
+| soon | p3 |
+| (none) | p4 (default) |
+
+### Projects
+Tasks are placed in the user's Inbox by default. The AI can route to specific projects based on context.
 
 ## Environment Variables
 
@@ -238,10 +256,8 @@ REDIS_URL=redis://localhost:6379
 SENDBLUE_API_KEY=...
 SENDBLUE_API_SECRET=...
 
-# Notion OAuth
-NOTION_CLIENT_ID=...
-NOTION_CLIENT_SECRET=...
-NOTION_REDIRECT_URI=https://your-api.railway.app/auth/notion/callback
+# Todoist (for development/testing)
+TODOIST_API_TOKEN=...
 
 # Google Gemini AI
 GEMINI_API_KEY=...
@@ -263,6 +279,7 @@ Both Dockerfiles need the scheduler's package.json in the deps stage for the mon
 ## Current State & Known Issues
 
 ### Recently Implemented
+- [x] Todoist migration (replaced Notion)
 - [x] LLM-driven intent system (35+ intents)
 - [x] Fuzzy name matching with Levenshtein distance
 - [x] Task editing commands (reschedule, rename, delete, etc.)
@@ -275,6 +292,8 @@ Both Dockerfiles need the scheduler's package.json in the deps stage for the mon
 - [x] Professional WAITING task titles (e.g., "Person to deliver X")
 - [x] Context guidance in prompt (calls for quick phone tasks, computer for dense work)
 - [x] Required context/priority with smart defaults (no null values)
+- [x] Weekly review feature (scheduled SMS + interactive REVIEW command)
+- [x] Batch operations with confirmation flow
 
 ### Classifier Modes
 The classifier has two modes (passed as 5th parameter):
@@ -292,18 +311,14 @@ The `cleanupTaskTitle()` function in `classifier.ts` defensively strips casual p
 Applied in `normalizeTaskResult()` even if LLM ignores prompt instructions.
 
 ### Known Issues
-1. **Notion Status filter** - Uses `select` type, not native `status` type
+1. Legacy Notion columns still in database (kept for data preservation)
 
 ### TODOs
-- [x] Implement undo functionality (needs action history)
+- [ ] Implement Todoist OAuth flow for multi-user support
+- [ ] Add two-way sync (Todoist changes → local DB)
+- [ ] Project health tracking
 - [ ] Implement `change_task_type` (needs last task tracking)
 - [ ] Add conversation state for post-meeting flow
-- [ ] Project health tracking
-
-### Recently Implemented
-- [x] Weekly review feature (scheduled SMS + interactive REVIEW command)
-- [x] Batch operations with confirmation flow (complete_all_today, complete_all_context, clear_person_agenda)
-- [x] Weekly review settings (set_review_day, set_review_time)
 
 ## Testing Locally
 
@@ -332,12 +347,10 @@ pnpm build
 
 ```sql
 INSERT INTO users (
-  phone_number, status, notion_access_token,
-  notion_tasks_database_id, notion_people_database_id,
+  phone_number, status, todoist_access_token,
   timezone, digest_time
 ) VALUES (
-  '+15551234567', 'active', 'ntn_xxx...',
-  'database-id-1', 'database-id-2',
+  '+15551234567', 'active', 'your_todoist_api_token',
   'America/New_York', '08:00'
 );
 ```
@@ -363,4 +376,4 @@ railway logs
 
 ---
 
-*Last updated: January 17, 2026 (session 3 - weekly review feature, batch operations with confirmation)*
+*Last updated: January 20, 2026 (Todoist migration - replaced Notion with Todoist REST API)*

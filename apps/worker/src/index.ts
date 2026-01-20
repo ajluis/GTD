@@ -8,7 +8,7 @@ import {
 } from '@gtd/queue';
 import { createInboundProcessor } from './processors/inbound.js';
 import { createHybridClassifyProcessor } from './processors/classify-hybrid.js';
-import { createNotionSyncProcessor } from './processors/notion-sync.js';
+import { createTodoistSyncProcessor } from './processors/todoist-sync.js';
 import { createOutboundProcessor } from './processors/outbound.js';
 
 /**
@@ -17,7 +17,7 @@ import { createOutboundProcessor } from './processors/outbound.js';
  * Processes background jobs:
  * - Inbound message handling
  * - AI classification
- * - Notion synchronization
+ * - Todoist synchronization
  * - Outbound SMS sending
  */
 async function main() {
@@ -56,7 +56,7 @@ async function main() {
   // Create processors
   const inboundProcessor = createInboundProcessor(db, messageQueue, config.appUrl);
   const classifyProcessor = createHybridClassifyProcessor(db, messageQueue);
-  const notionSyncProcessor = createNotionSyncProcessor(db);
+  const todoistSyncProcessor = createTodoistSyncProcessor(db);
   const outboundProcessor = createOutboundProcessor(db);
 
   // Create worker
@@ -72,8 +72,8 @@ async function main() {
           return inboundProcessor(job as any);
         case 'classify':
           return classifyProcessor(job as any);
-        case 'notion-sync':
-          return notionSyncProcessor(job as any);
+        case 'todoist-sync':
+          return todoistSyncProcessor(job as any);
         case 'outbound':
           return outboundProcessor(job as any);
         default:

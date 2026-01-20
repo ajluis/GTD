@@ -1,12 +1,12 @@
 # GTD - SMS-Based GTD Task Management
 
-GTD is an SMS-based GTD (Getting Things Done) assistant that syncs with Notion. Text your tasks, thoughts, and discussion topics — GTD uses AI to classify them and organizes everything in Notion automatically.
+GTD is an SMS-based GTD (Getting Things Done) assistant that syncs with Todoist. Text your tasks, thoughts, and discussion topics — GTD uses AI to classify them and organizes everything in Todoist automatically.
 
 ## Features
 
 - 📱 **SMS Interface** - Capture tasks naturally via text message
 - 🤖 **AI Classification** - Gemini AI categorizes tasks into GTD types
-- 📋 **Notion Sync** - Tasks automatically appear in your Notion workspace
+- ✅ **Todoist Sync** - Tasks automatically appear in your Todoist workspace
 - 👥 **Agenda Management** - Track discussion topics for each person you meet with
 - ⏳ **Waiting Items** - Track what you're waiting for from others
 - 💭 **Someday/Maybe** - Capture future ideas without cluttering your actions
@@ -18,7 +18,7 @@ GTD is an SMS-based GTD (Getting Things Done) assistant that syncs with Notion. 
 | Runtime | Node.js 20 + TypeScript |
 | SMS Gateway | Sendblue |
 | AI | Google Gemini Flash (gemini-2.0-flash) |
-| Database | Notion API + PostgreSQL |
+| Task Storage | Todoist API + PostgreSQL |
 | Job Queue | Redis + BullMQ |
 | Hosting | Railway |
 
@@ -28,13 +28,14 @@ GTD is an SMS-based GTD (Getting Things Done) assistant that syncs with Notion. 
 gtd/
 ├── apps/
 │   ├── api/          # Fastify webhook server
-│   └── worker/       # BullMQ message processor
+│   ├── worker/       # BullMQ message processor
+│   └── scheduler/    # Cron jobs (daily digest, reminders)
 ├── packages/
 │   ├── database/     # Drizzle ORM schemas
 │   ├── queue/        # BullMQ configuration
 │   ├── sendblue/     # Sendblue API client
-│   ├── notion/       # Notion API integration
-│   ├── ai/           # Gemini classification
+│   ├── todoist/      # Todoist API integration
+│   ├── ai/           # Gemini classification + LLM tools
 │   ├── gtd/          # GTD domain logic
 │   └── shared-types/ # TypeScript types
 └── docker-compose.yml
@@ -52,7 +53,7 @@ gtd/
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/ajluis/GTD.git clarity
+   git clone https://github.com/ajluis/GTD.git gtd
    cd gtd
    ```
 
@@ -99,10 +100,8 @@ SENDBLUE_API_SECRET=
 SENDBLUE_WEBHOOK_SECRET=
 SENDBLUE_PHONE_NUMBER=
 
-# Notion
-NOTION_CLIENT_ID=
-NOTION_CLIENT_SECRET=
-NOTION_REDIRECT_URI=
+# Todoist
+TODOIST_API_TOKEN=
 
 # Google AI
 GOOGLE_AI_API_KEY=
@@ -130,7 +129,7 @@ SMS arrives → Sendblue Webhook → API Server → BullMQ Queue
                                             Worker processes:
                                             1. Classify with Gemini AI
                                             2. Create local task
-                                            3. Sync to Notion
+                                            3. Sync to Todoist
                                             4. Send confirmation SMS
 ```
 

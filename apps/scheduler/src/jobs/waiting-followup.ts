@@ -5,11 +5,10 @@ import { eq, and, isNotNull } from 'drizzle-orm';
 import { enqueueOutboundMessage } from '@gtd/queue';
 import type { MessageJobData } from '@gtd/queue';
 import {
-  createNotionClient,
-  queryWaitingTasks,
-  extractTaskTitle,
-  extractTaskDueDate,
-} from '@gtd/notion';
+  createTodoistClient,
+  queryOverdueWaiting,
+  type TodoistTaskResult,
+} from '@gtd/todoist';
 
 /**
  * Waiting Follow-up Job
@@ -21,37 +20,43 @@ import {
  */
 
 /**
+ * Extract title from Todoist task
+ */
+function extractTaskTitle(task: TodoistTaskResult): string {
+  return task.content;
+}
+
+/**
+ * Extract due date from Todoist task
+ */
+function extractTaskDueDate(task: TodoistTaskResult): string | undefined {
+  return task.due?.date;
+}
+
+/**
  * Run the waiting follow-ups job
  */
 export async function runWaitingFollowups(
   db: DbClient,
   messageQueue: Queue<MessageJobData>
 ): Promise<void> {
-  const today = new Date().toISOString().split('T')[0]!;
-
-  // Find all active users with Notion configured
+  // Find all active users with Todoist configured
   const activeUsers = await db.query.users.findMany({
     where: and(
       eq(users.status, 'active'),
-      isNotNull(users.notionAccessToken),
-      isNotNull(users.notionTasksDatabaseId)
+      isNotNull(users.todoistAccessToken)
     ),
   });
 
   for (const user of activeUsers) {
     try {
-      if (!user.notionAccessToken || !user.notionTasksDatabaseId) {
+      if (!user.todoistAccessToken) {
         continue;
       }
 
-      const notion = createNotionClient(user.notionAccessToken);
-      const waitingTasks = await queryWaitingTasks(notion, user.notionTasksDatabaseId);
-
-      // Filter to overdue items
-      const overdueItems = waitingTasks.filter((task: unknown) => {
-        const dueDate = extractTaskDueDate(task);
-        return dueDate && dueDate < today;
-      });
+      const todoist = createTodoistClient(user.todoistAccessToken);
+      // Query directly for overdue waiting tasks using Todoist filter
+      const overdueItems = await queryOverdueWaiting(todoist);
 
       if (overdueItems.length === 0) {
         continue;
@@ -76,7 +81,7 @@ export async function runWaitingFollowups(
 /**
  * Format waiting reminder message
  */
-function formatWaitingReminder(overdueItems: unknown[]): string {
+function formatWaitingReminder(overdueItems: TodoistTaskResult[]): string {
   const count = overdueItems.length;
 
   const lines: string[] = [

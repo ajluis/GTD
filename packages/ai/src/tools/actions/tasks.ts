@@ -279,43 +279,19 @@ export const updateTask: Tool = {
         // Generate search variations (e.g., "shopping" -> ["shopping", "shop"])
         const searchVariations = generateSearchVariations(searchText.toLowerCase());
 
-        // First try Notion if available
-        if (context.notionClient && context.notionTasksDatabaseId) {
-          const response = await context.notionClient.databases.query({
-            database_id: context.notionTasksDatabaseId,
-            filter: {
-              and: [
-                { property: 'Status', select: { does_not_equal: 'Done' } },
-              ],
-            },
-            page_size: 50,
+        // Search local DB - try each variation
+        for (const term of searchVariations) {
+          const localTasks = await context.db.query.tasks.findMany({
+            where: and(
+              eq(tasks.userId, context.userId),
+              ilike(tasks.title, `%${term}%`)
+            ),
+            limit: 1,
           });
 
-          const match = response.results.find((page: any) => {
-            const title = (page.properties?.Task?.title?.[0]?.plain_text ?? '').toLowerCase();
-            return searchVariations.some(term => title.includes(term));
-          });
-
-          if (match) {
-            resolvedTaskId = (match as any).id;
-          }
-        }
-
-        // Fall back to local DB - try each variation
-        if (!resolvedTaskId) {
-          for (const term of searchVariations) {
-            const localTasks = await context.db.query.tasks.findMany({
-              where: and(
-                eq(tasks.userId, context.userId),
-                ilike(tasks.title, `%${term}%`)
-              ),
-              limit: 1,
-            });
-
-            if (localTasks.length > 0) {
-              resolvedTaskId = localTasks[0]!.id;
-              break;
-            }
+          if (localTasks.length > 0) {
+            resolvedTaskId = localTasks[0]!.id;
+            break;
           }
         }
       }
@@ -335,11 +311,9 @@ export const updateTask: Tool = {
       });
 
       if (!currentTask) {
-        // Task might be in Notion only - for now return error
-        // TODO: Support updating Notion-only tasks
         return {
           success: false,
-          error: 'Task found in Notion but not synced locally. Please sync first.',
+          error: 'Task not found',
         };
       }
 
@@ -478,7 +452,7 @@ export const completeTask: Tool = {
         undoAction: {
           type: 'uncomplete_task',
           taskId: taskId,
-          notionPageId: task.notionPageId || undefined,
+          todoistTaskId: task.todoistTaskId || undefined,
         },
       };
     } catch (error) {
@@ -534,7 +508,7 @@ export const deleteTask: Tool = {
         dueDate: task.dueDate,
         personId: task.personId,
         notes: task.notes,
-        notionPageId: task.notionPageId,
+        todoistTaskId: task.todoistTaskId,
       };
 
       // Delete task
@@ -612,7 +586,7 @@ export const undoLastAction: Tool = {
               dueDate: action.taskData.dueDate,
               personId: action.taskData.personId,
               notes: action.taskData.notes,
-              notionPageId: action.taskData.notionPageId,
+              todoistTaskId: action.taskData.todoistTaskId,
             })
             .returning();
           return {

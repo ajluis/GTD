@@ -57,8 +57,11 @@ export const tasks = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
 
-    /** Notion page ID after sync */
+    /** Notion page ID after sync (legacy) */
     notionPageId: text('notion_page_id').unique(),
+
+    /** Todoist task ID after sync */
+    todoistTaskId: text('todoist_task_id').unique(),
 
     // Task Content
     /** Original SMS text as received */
@@ -116,6 +119,7 @@ export const tasks = pgTable(
     index('idx_tasks_user_person').on(table.userId, table.personId),
     index('idx_tasks_user_due').on(table.userId, table.dueDate),
     index('idx_tasks_notion_page').on(table.notionPageId),
+    index('idx_tasks_todoist_task').on(table.todoistTaskId),
     index('idx_tasks_parent_project').on(table.parentProjectId),
   ]
 );

@@ -15,7 +15,6 @@
     "@gtd/ai": "workspace:*",
     "@gtd/database": "workspace:*",
     "@gtd/gtd": "workspace:*",
-    "@gtd/notion": "workspace:*",
     "@gtd/todoist": "workspace:*",
     "@gtd/queue": "workspace:*",
     "@gtd/sendblue": "workspace:*",

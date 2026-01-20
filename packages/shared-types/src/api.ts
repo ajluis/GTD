@@ -94,7 +94,7 @@ export interface HealthResponse {
   services: {
     database: boolean;
     redis: boolean;
-    notion?: boolean;
+    todoist?: boolean;
     sendblue?: boolean;
   };
 }
@@ -117,31 +117,3 @@ export interface ErrorResponse {
   statusCode: number;
 }
 
-/**
- * Notion OAuth callback params
- */
-export interface NotionOAuthCallback {
-  code: string;
-  state?: string;
-}
-
-/**
- * Notion OAuth token response
- */
-export interface NotionOAuthTokenResponse {
-  access_token: string;
-  token_type: string;
-  bot_id: string;
-  workspace_id: string;
-  workspace_name: string;
-  workspace_icon: string | null;
-  owner: {
-    type: string;
-    user?: {
-      id: string;
-      name: string;
-      avatar_url: string | null;
-    };
-  };
-  duplicated_template_id: string | null;
-}

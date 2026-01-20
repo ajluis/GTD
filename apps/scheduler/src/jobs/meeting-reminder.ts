@@ -5,10 +5,10 @@ import { eq, and, isNotNull } from 'drizzle-orm';
 import { enqueueOutboundMessage } from '@gtd/queue';
 import type { MessageJobData } from '@gtd/queue';
 import {
-  createNotionClient,
-  queryAgendaForPerson,
-  extractTaskTitle,
-} from '@gtd/notion';
+  createTodoistClient,
+  queryPersonAgenda,
+  type TodoistTaskResult,
+} from '@gtd/todoist';
 import type { DayOfWeek } from '@gtd/shared-types';
 
 /**
@@ -32,6 +32,13 @@ const DAY_NAMES: DayOfWeek[] = [
 ];
 
 /**
+ * Extract title from Todoist task
+ */
+function extractTaskTitle(task: TodoistTaskResult): string {
+  return task.content;
+}
+
+/**
  * Run the meeting reminders job
  */
 export async function runMeetingReminders(
@@ -41,12 +48,11 @@ export async function runMeetingReminders(
   // Get current day of week
   const now = new Date();
 
-  // Find all active users with Notion configured
+  // Find all active users with Todoist configured
   const activeUsers = await db.query.users.findMany({
     where: and(
       eq(users.status, 'active'),
-      isNotNull(users.notionAccessToken),
-      isNotNull(users.notionTasksDatabaseId)
+      isNotNull(users.todoistAccessToken)
     ),
   });
 
@@ -80,17 +86,10 @@ export async function runMeetingReminders(
 
       // Send reminder for each person with a meeting today
       for (const person of userPeople) {
-        if (!person.notionPageId) {
-          continue;
-        }
-
-        // Get pending agenda count
-        const notion = createNotionClient(user.notionAccessToken!);
-        const agendaItems = await queryAgendaForPerson(
-          notion,
-          user.notionTasksDatabaseId!,
-          person.notionPageId
-        );
+        // Get pending agenda count using person's label
+        const todoist = createTodoistClient(user.todoistAccessToken!);
+        const personLabel = person.todoistLabel || person.name.toLowerCase().replace(/\s+/g, '_');
+        const agendaItems = await queryPersonAgenda(todoist, personLabel);
 
         // Format and send reminder
         const message = formatMeetingReminder(person.name, agendaItems);
@@ -152,7 +151,7 @@ function getHourInTimezone(date: Date, timezone: string): number {
 /**
  * Format meeting reminder message
  */
-function formatMeetingReminder(personName: string, agendaItems: unknown[]): string {
+function formatMeetingReminder(personName: string, agendaItems: TodoistTaskResult[]): string {
   const itemCount = agendaItems.length;
 
   if (itemCount === 0) {

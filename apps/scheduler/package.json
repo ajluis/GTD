@@ -14,7 +14,7 @@
   "dependencies": {
     "@gtd/database": "workspace:*",
     "@gtd/gtd": "workspace:*",
-    "@gtd/notion": "workspace:*",
+    "@gtd/todoist": "workspace:*",
     "@gtd/queue": "workspace:*",
     "@gtd/shared-types": "workspace:*",
     "bullmq": "^5.30.0",

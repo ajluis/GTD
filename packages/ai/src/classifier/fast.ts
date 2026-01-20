@@ -22,6 +22,11 @@ export interface FastClassifyOptions {
   currentTime: Date;
   /** Recent messages for context (last 2-3) */
   recentMessages?: Array<{ role: string; content: string }>;
+  /**
+   * Available Todoist project names for AI routing
+   * If provided, classifier will select the most appropriate project for tasks
+   */
+  availableProjects?: string[];
 }
 
 /**
@@ -38,13 +43,14 @@ export class FastClassifier {
    * Classify a message quickly without full context
    */
   async classify(options: FastClassifyOptions): Promise<FastClassifyResult> {
-    const { message, timezone, currentTime, recentMessages } = options;
+    const { message, timezone, currentTime, recentMessages, availableProjects } = options;
 
     const prompt = buildFastClassifyPrompt(
       message,
       timezone,
       currentTime,
-      recentMessages
+      recentMessages,
+      availableProjects
     );
 
     try {
@@ -108,6 +114,7 @@ export class FastClassifier {
       priority?: string;
       dueDate?: string;
       personName?: string;
+      targetProject?: string;
     }
   >(task: T): T {
     // Ensure type is valid

@@ -5,14 +5,14 @@ import { createDbClient } from '@gtd/database';
 import { createRedisConnection, createMessageQueue } from '@gtd/queue';
 import { healthRoutes } from './routes/health.js';
 import { createSendblueWebhook } from './routes/webhooks/sendblue.js';
-import { createNotionOAuthRoutes } from './routes/oauth/notion.js';
+import { createTodoistOAuthRoutes } from './routes/oauth/todoist.js';
 
 /**
  * GTD API Server
  *
  * Handles:
  * - Sendblue webhook for incoming SMS
- * - Notion OAuth flow
+ * - Todoist OAuth flow
  * - Health checks
  */
 async function main() {
@@ -73,19 +73,18 @@ async function main() {
     { prefix: '/webhooks/sendblue' }
   );
 
-  // Only register Notion OAuth routes if OAuth credentials are configured
-  // (Skip for internal integration mode)
-  if (process.env['NOTION_CLIENT_ID'] && process.env['NOTION_CLIENT_SECRET']) {
+  // Register Todoist OAuth routes (primary task storage)
+  if (process.env['TODOIST_CLIENT_ID'] && process.env['TODOIST_CLIENT_SECRET']) {
     await fastify.register(
-      createNotionOAuthRoutes({
+      createTodoistOAuthRoutes({
         db,
         appUrl: config.appUrl,
       }),
-      { prefix: '/oauth/notion' }
+      { prefix: '/oauth/todoist' }
     );
-    fastify.log.info('Notion OAuth routes registered');
+    fastify.log.info('Todoist OAuth routes registered');
   } else {
-    fastify.log.info('Notion OAuth routes skipped (using internal integration mode)');
+    fastify.log.info('Todoist OAuth routes skipped (credentials not configured)');
   }
 
   // Graceful shutdown

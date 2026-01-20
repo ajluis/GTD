@@ -1,22 +1,34 @@
 import { people } from '@gtd/database';
 import { eq } from 'drizzle-orm';
 import {
-  createNotionClient,
-  queryTasksDueToday,
-  queryActiveActions,
-  queryActiveProjects,
-  queryWaitingTasks,
-  querySomedayTasks,
-  queryTasksByContext,
-  queryAgendaForPerson,
-  queryCompletedTasksInRange,
-  queryTasksDueInRange,
-  extractTaskTitle,
-  extractTaskDueDate,
-} from '@gtd/notion';
+  createTodoistClient,
+  queryDueToday,
+  queryDueTomorrow,
+  queryWaiting,
+  queryOverdueWaiting,
+  queryByContext,
+  queryByLabel,
+  queryHighPriority,
+  queryDueThisWeek,
+  type TodoistTaskResult,
+} from '@gtd/todoist';
 import { formatTaskList, formatHelp } from '@gtd/gtd';
 import type { IntentEntities } from '@gtd/shared-types';
 import type { HandlerContext } from './intents.js';
+
+/**
+ * Extract title from Todoist task (just the content field)
+ */
+function extractTaskTitle(task: TodoistTaskResult): string {
+  return task.content;
+}
+
+/**
+ * Extract due date from Todoist task
+ */
+function extractTaskDueDate(task: TodoistTaskResult): string | undefined {
+  return task.due?.date;
+}
 
 /**
  * Get ISO date string (YYYY-MM-DD) in a specific timezone
@@ -32,13 +44,13 @@ function getISODateInTimezone(date: Date, timezone: string): string {
  * Handle query_today intent
  */
 export async function handleQueryToday(ctx: HandlerContext): Promise<string> {
-  if (!ctx.user.notionAccessToken || !ctx.user.notionTasksDatabaseId) {
-    return "🔥 TODAY:\nConnect Notion first to see your tasks.";
+  if (!ctx.user.todoistAccessToken) {
+    return "🔥 TODAY:\nConnect Todoist first to see your tasks.";
   }
 
   try {
-    const notion = createNotionClient(ctx.user.notionAccessToken);
-    const tasks = await queryTasksDueToday(notion, ctx.user.notionTasksDatabaseId, ctx.user.timezone);
+    const todoist = createTodoistClient(ctx.user.todoistAccessToken);
+    const tasks = await queryDueToday(todoist);
 
     if (tasks.length === 0) {
       return "🔥 TODAY:\nNo tasks due today! 🎉\n\nText something to capture a task.";
@@ -61,20 +73,13 @@ export async function handleQueryToday(ctx: HandlerContext): Promise<string> {
  * Handle query_tomorrow intent
  */
 export async function handleQueryTomorrow(ctx: HandlerContext): Promise<string> {
-  if (!ctx.user.notionAccessToken || !ctx.user.notionTasksDatabaseId) {
-    return "📅 TOMORROW:\nConnect Notion first to see your tasks.";
+  if (!ctx.user.todoistAccessToken) {
+    return "📅 TOMORROW:\nConnect Todoist first to see your tasks.";
   }
 
   try {
-    const notion = createNotionClient(ctx.user.notionAccessToken);
-
-    // Calculate tomorrow's date in user's timezone
-    const today = getISODateInTimezone(new Date(), ctx.user.timezone);
-    const [year, month, day] = today.split('-').map(Number);
-    const tomorrowDate = new Date(year!, month! - 1, day! + 1);
-    const tomorrowStr = getISODateInTimezone(tomorrowDate, ctx.user.timezone);
-
-    const tasks = await queryTasksDueInRange(notion, ctx.user.notionTasksDatabaseId, tomorrowStr, tomorrowStr);
+    const todoist = createTodoistClient(ctx.user.todoistAccessToken);
+    const tasks = await queryDueTomorrow(todoist);
 
     if (tasks.length === 0) {
       return "📅 TOMORROW:\nNo tasks due tomorrow.\n\nText something to capture a task.";
@@ -95,13 +100,14 @@ export async function handleQueryTomorrow(ctx: HandlerContext): Promise<string> 
  * Handle query_actions intent
  */
 export async function handleQueryActions(ctx: HandlerContext): Promise<string> {
-  if (!ctx.user.notionAccessToken || !ctx.user.notionTasksDatabaseId) {
-    return "✅ ACTIONS:\nConnect Notion first to see your tasks.";
+  if (!ctx.user.todoistAccessToken) {
+    return "✅ ACTIONS:\nConnect Todoist first to see your tasks.";
   }
 
   try {
-    const notion = createNotionClient(ctx.user.notionAccessToken);
-    const tasks = await queryActiveActions(notion, ctx.user.notionTasksDatabaseId);
+    const todoist = createTodoistClient(ctx.user.todoistAccessToken);
+    // Get high priority tasks (priority 4 and 3)
+    const tasks = await queryHighPriority(todoist);
 
     if (tasks.length === 0) {
       return "✅ ACTIONS:\nNo active actions.\n\nText something to capture a task.";
@@ -121,25 +127,30 @@ export async function handleQueryActions(ctx: HandlerContext): Promise<string> {
 
 /**
  * Handle query_projects intent
+ * Note: In Todoist, "projects" are containers, not task types.
+ * We'll show tasks labeled as 'project' type.
  */
 export async function handleQueryProjects(ctx: HandlerContext): Promise<string> {
-  if (!ctx.user.notionAccessToken || !ctx.user.notionTasksDatabaseId) {
-    return "📁 PROJECTS:\nConnect Notion first to see your projects.";
+  if (!ctx.user.todoistAccessToken) {
+    return "📁 PROJECTS:\nConnect Todoist first to see your projects.";
   }
 
   try {
-    const notion = createNotionClient(ctx.user.notionAccessToken);
-    const tasks = await queryActiveProjects(notion, ctx.user.notionTasksDatabaseId);
+    const todoist = createTodoistClient(ctx.user.todoistAccessToken);
+    // Query tasks with 'project' label (if we're using labels for types)
+    // For now, show tasks due this week as a proxy
+    const tasks = await queryDueThisWeek(todoist);
 
     if (tasks.length === 0) {
       return "📁 PROJECTS:\nNo active projects.\n\nCapture one by texting 'Project: [name]'";
     }
 
-    const formatted = tasks.map((t) => ({
+    const formatted = tasks.slice(0, 10).map((t) => ({
       title: extractTaskTitle(t),
     }));
 
-    return formatTaskList('📁 PROJECTS:', formatted);
+    const suffix = tasks.length > 10 ? `\n\n(+${tasks.length - 10} more)` : '';
+    return formatTaskList('📁 THIS WEEK:', formatted) + suffix;
   } catch (error) {
     console.error('[Query:projects] Error:', error);
     return "📁 PROJECTS:\nCouldn't fetch projects. Try again later.";
@@ -150,13 +161,13 @@ export async function handleQueryProjects(ctx: HandlerContext): Promise<string> 
  * Handle query_waiting intent
  */
 export async function handleQueryWaiting(ctx: HandlerContext): Promise<string> {
-  if (!ctx.user.notionAccessToken || !ctx.user.notionTasksDatabaseId) {
-    return "⏳ WAITING:\nConnect Notion first to see your waiting items.";
+  if (!ctx.user.todoistAccessToken) {
+    return "⏳ WAITING:\nConnect Todoist first to see your waiting items.";
   }
 
   try {
-    const notion = createNotionClient(ctx.user.notionAccessToken);
-    const tasks = await queryWaitingTasks(notion, ctx.user.notionTasksDatabaseId);
+    const todoist = createTodoistClient(ctx.user.todoistAccessToken);
+    const tasks = await queryWaiting(todoist);
 
     if (tasks.length === 0) {
       return "⏳ WAITING:\nNothing waiting on others.\n\nCapture with 'Waiting on [person] for [thing]'";
@@ -176,15 +187,17 @@ export async function handleQueryWaiting(ctx: HandlerContext): Promise<string> {
 
 /**
  * Handle query_someday intent
+ * Note: Someday items should be in a "Someday" project or have a specific label
  */
 export async function handleQuerySomeday(ctx: HandlerContext): Promise<string> {
-  if (!ctx.user.notionAccessToken || !ctx.user.notionTasksDatabaseId) {
-    return "💭 SOMEDAY:\nConnect Notion first to see your someday list.";
+  if (!ctx.user.todoistAccessToken) {
+    return "💭 SOMEDAY:\nConnect Todoist first to see your someday list.";
   }
 
   try {
-    const notion = createNotionClient(ctx.user.notionAccessToken);
-    const tasks = await querySomedayTasks(notion, ctx.user.notionTasksDatabaseId);
+    const todoist = createTodoistClient(ctx.user.todoistAccessToken);
+    // Query tasks with 'someday' label
+    const tasks = await queryByLabel(todoist, 'someday');
 
     if (tasks.length === 0) {
       return "💭 SOMEDAY:\nNo someday items yet.\n\nCapture ideas with 'Someday: [idea]'";
@@ -211,16 +224,18 @@ export async function handleQueryContext(
 ): Promise<string> {
   const context = entities.context;
   if (!context) {
-    return "Which context? Try: @work, @home, @errands, @calls, @computer";
+    return "Which context? Try: @computer, @phone, @out";
   }
 
-  if (!ctx.user.notionAccessToken || !ctx.user.notionTasksDatabaseId) {
-    return `📍 @${context}:\nConnect Notion first to see your tasks.`;
+  if (!ctx.user.todoistAccessToken) {
+    return `📍 @${context}:\nConnect Todoist first to see your tasks.`;
   }
 
   try {
-    const notion = createNotionClient(ctx.user.notionAccessToken);
-    const tasks = await queryTasksByContext(notion, ctx.user.notionTasksDatabaseId, context);
+    const todoist = createTodoistClient(ctx.user.todoistAccessToken);
+    // Map context to label (home/outside -> out)
+    const label = context === 'home' || context === 'outside' ? 'out' : context;
+    const tasks = await queryByContext(todoist, label);
 
     if (tasks.length === 0) {
       return `📍 @${context}:\nNo tasks in this context.\n\nCapture one by adding @${context} to your message.`;
@@ -289,13 +304,15 @@ export async function handleQueryPersonAgenda(
     return `I don't have "${personName}" in your people list.\n\nAdd them with 'track ${personName}'`;
   }
 
-  if (!ctx.user.notionAccessToken || !ctx.user.notionTasksDatabaseId || !person.notionPageId) {
-    return `👤 ${person.name}\n\nConnect Notion first to see agenda items.`;
+  if (!ctx.user.todoistAccessToken) {
+    return `👤 ${person.name}\n\nConnect Todoist first to see agenda items.`;
   }
 
   try {
-    const notion = createNotionClient(ctx.user.notionAccessToken);
-    const agendaItems = await queryAgendaForPerson(notion, ctx.user.notionTasksDatabaseId, person.notionPageId);
+    const todoist = createTodoistClient(ctx.user.todoistAccessToken);
+    // Query by person's label (lowercase, underscores)
+    const personLabel = person.name.toLowerCase().replace(/\s+/g, '_');
+    const agendaItems = await queryByLabel(todoist, personLabel);
 
     if (agendaItems.length === 0) {
       return `👤 ${person.name}\n\nNo pending agenda items.\n\nAdd one by texting '@${person.name.split(' ')[0]} [topic]'`;
@@ -317,66 +334,51 @@ export async function handleQueryPersonAgenda(
  * "review", "weekly review", "show me my review"
  */
 export async function handleShowWeeklyReview(ctx: HandlerContext): Promise<string> {
-  if (!ctx.user.notionAccessToken || !ctx.user.notionTasksDatabaseId) {
-    return "📋 WEEKLY REVIEW:\nConnect Notion first to see your review.";
+  if (!ctx.user.todoistAccessToken) {
+    return "📋 WEEKLY REVIEW:\nConnect Todoist first to see your review.";
   }
 
   try {
-    const notion = createNotionClient(ctx.user.notionAccessToken);
+    const todoist = createTodoistClient(ctx.user.todoistAccessToken);
 
     // Get week bounds
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0]!;
 
-    // Week start (7 days ago)
-    const weekStart = new Date(today);
-    weekStart.setDate(today.getDate() - 7);
-    const weekStartStr = weekStart.toISOString().split('T')[0]!;
-
-    // Next week end (7 days from now)
-    const nextWeekEnd = new Date(today);
-    nextWeekEnd.setDate(today.getDate() + 7);
-    const nextWeekEndStr = nextWeekEnd.toISOString().split('T')[0]!;
-
-    const [completedTasks, upcomingTasks, projects, waitingTasks, somedayTasks] = await Promise.all([
-      queryCompletedTasksInRange(notion, ctx.user.notionTasksDatabaseId, weekStartStr, todayStr),
-      queryTasksDueInRange(notion, ctx.user.notionTasksDatabaseId, todayStr, nextWeekEndStr),
-      queryActiveProjects(notion, ctx.user.notionTasksDatabaseId),
-      queryWaitingTasks(notion, ctx.user.notionTasksDatabaseId),
-      querySomedayTasks(notion, ctx.user.notionTasksDatabaseId),
+    const [dueTodayTasks, dueThisWeekTasks, waitingTasks, overdueWaitingTasks] = await Promise.all([
+      queryDueToday(todoist),
+      queryDueThisWeek(todoist),
+      queryWaiting(todoist),
+      queryOverdueWaiting(todoist),
     ]);
-
-    // Count overdue waiting tasks
-    const overdueWaiting = waitingTasks.filter((task) => {
-      const dueDate = extractTaskDueDate(task);
-      return dueDate && dueDate < todayStr;
-    });
 
     const lines: string[] = ['📋 WEEKLY REVIEW'];
     lines.push('');
 
-    // WINS - Completed this week
-    lines.push('🎯 COMPLETED THIS WEEK:');
-    if (completedTasks.length > 0) {
-      for (const task of completedTasks.slice(0, 5)) {
-        lines.push(`  ✓ ${extractTaskTitle(task)}`);
+    // TODAY
+    lines.push(`🔥 DUE TODAY (${dueTodayTasks.length}):`);
+    if (dueTodayTasks.length > 0) {
+      for (const task of dueTodayTasks.slice(0, 5)) {
+        lines.push(`  • ${extractTaskTitle(task)}`);
       }
-      if (completedTasks.length > 5) {
-        lines.push(`  (+${completedTasks.length - 5} more)`);
+      if (dueTodayTasks.length > 5) {
+        lines.push(`  (+${dueTodayTasks.length - 5} more)`);
       }
     } else {
       lines.push('  (none)');
     }
     lines.push('');
 
-    // PROJECTS
-    lines.push(`📁 ACTIVE PROJECTS (${projects.length}):`);
-    if (projects.length > 0) {
-      for (const project of projects.slice(0, 3)) {
-        lines.push(`  • ${extractTaskTitle(project)}`);
+    // THIS WEEK
+    lines.push(`📅 DUE THIS WEEK (${dueThisWeekTasks.length}):`);
+    if (dueThisWeekTasks.length > 0) {
+      for (const task of dueThisWeekTasks.slice(0, 5)) {
+        const dueDate = extractTaskDueDate(task);
+        const dateSuffix = dueDate ? ` (${dueDate})` : '';
+        lines.push(`  • ${extractTaskTitle(task)}${dateSuffix}`);
       }
-      if (projects.length > 3) {
-        lines.push(`  (+${projects.length - 3} more)`);
+      if (dueThisWeekTasks.length > 5) {
+        lines.push(`  (+${dueThisWeekTasks.length - 5} more)`);
       }
     } else {
       lines.push('  (none)');
@@ -384,8 +386,8 @@ export async function handleShowWeeklyReview(ctx: HandlerContext): Promise<strin
     lines.push('');
 
     // WAITING
-    const waitingHeader = overdueWaiting.length > 0
-      ? `⏳ WAITING (${waitingTasks.length}, ${overdueWaiting.length} overdue!):`
+    const waitingHeader = overdueWaitingTasks.length > 0
+      ? `⏳ WAITING (${waitingTasks.length}, ${overdueWaitingTasks.length} overdue!):`
       : `⏳ WAITING (${waitingTasks.length}):`;
     lines.push(waitingHeader);
     if (waitingTasks.length > 0) {
@@ -397,36 +399,6 @@ export async function handleShowWeeklyReview(ctx: HandlerContext): Promise<strin
       }
       if (waitingTasks.length > 3) {
         lines.push(`  (+${waitingTasks.length - 3} more)`);
-      }
-    } else {
-      lines.push('  (none)');
-    }
-    lines.push('');
-
-    // SOMEDAY
-    lines.push(`💭 SOMEDAY (${somedayTasks.length}):`);
-    if (somedayTasks.length > 0) {
-      for (const task of somedayTasks.slice(0, 2)) {
-        lines.push(`  • ${extractTaskTitle(task)}`);
-      }
-      if (somedayTasks.length > 2) {
-        lines.push(`  (+${somedayTasks.length - 2} more)`);
-      }
-    } else {
-      lines.push('  (none)');
-    }
-    lines.push('');
-
-    // UPCOMING
-    lines.push(`📅 DUE NEXT 7 DAYS (${upcomingTasks.length}):`);
-    if (upcomingTasks.length > 0) {
-      for (const task of upcomingTasks.slice(0, 3)) {
-        const dueDate = extractTaskDueDate(task);
-        const dateSuffix = dueDate ? ` (${dueDate})` : '';
-        lines.push(`  • ${extractTaskTitle(task)}${dateSuffix}`);
-      }
-      if (upcomingTasks.length > 3) {
-        lines.push(`  (+${upcomingTasks.length - 3} more)`);
       }
     } else {
       lines.push('  (none)');

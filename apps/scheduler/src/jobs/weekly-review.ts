@@ -5,15 +5,13 @@ import { eq, and, isNotNull } from 'drizzle-orm';
 import { enqueueOutboundMessage } from '@gtd/queue';
 import type { MessageJobData } from '@gtd/queue';
 import {
-  createNotionClient,
-  queryCompletedTasksInRange,
-  queryTasksDueInRange,
-  queryActiveProjects,
-  queryWaitingTasks,
-  querySomedayTasks,
-  extractTaskTitle,
-  extractTaskDueDate,
-} from '@gtd/notion';
+  createTodoistClient,
+  queryDueThisWeek,
+  queryWaiting,
+  queryOverdueWaiting,
+  queryByLabel,
+  type TodoistTaskResult,
+} from '@gtd/todoist';
 
 /**
  * Weekly Review Job
@@ -21,18 +19,26 @@ import {
  * Sends weekly review summary to users based on their preferences:
  * - Runs every minute
  * - Checks which users have weeklyReviewDay + weeklyReviewTime matching current time in their timezone
- * - Queries their Notion for weekly summary data
+ * - Queries their Todoist for weekly summary data
  * - Sends SMS summary
+ *
+ * Note: Todoist's REST API doesn't easily expose completed task history,
+ * so we focus on current state rather than weekly completion stats.
  */
 
 interface WeeklyReviewData {
-  completedThisWeek: number;
-  completedTasks: string[];
-  activeProjectsCount: number;
+  upcomingThisWeek: number;
+  topUpcoming: string[];
   waitingCount: number;
   overdueWaitingCount: number;
   somedayCount: number;
-  upcomingNextWeek: number;
+}
+
+/**
+ * Extract title from Todoist task
+ */
+function extractTaskTitle(task: TodoistTaskResult): string {
+  return task.content;
 }
 
 /**
@@ -48,8 +54,7 @@ export async function runWeeklyReview(
   const activeUsers = await db.query.users.findMany({
     where: and(
       eq(users.status, 'active'),
-      isNotNull(users.notionAccessToken),
-      isNotNull(users.notionTasksDatabaseId)
+      isNotNull(users.todoistAccessToken)
     ),
   });
 
@@ -63,7 +68,7 @@ export async function runWeeklyReview(
       console.log(`[WeeklyReview] Sending review to user ${user.id}`);
 
       // Query user's tasks for the week
-      const reviewData = await getWeeklyReviewData(user, user.timezone);
+      const reviewData = await getWeeklyReviewData(user);
 
       if (!reviewData) {
         continue;
@@ -116,70 +121,30 @@ function isWeeklyReviewTime(
 }
 
 /**
- * Get the start and end of the week for a given timezone
- */
-function getWeekBounds(timezone: string): { weekStart: string; weekEnd: string; nextWeekEnd: string } {
-  const now = new Date();
-
-  // Get today in the user's timezone
-  const todayStr = now.toLocaleDateString('en-CA', { timeZone: timezone }); // YYYY-MM-DD format
-  const today = new Date(todayStr + 'T00:00:00');
-
-  // Week start (7 days ago)
-  const weekStart = new Date(today);
-  weekStart.setDate(today.getDate() - 7);
-
-  // Week end (today)
-  const weekEnd = today;
-
-  // Next week end (7 days from now)
-  const nextWeekEnd = new Date(today);
-  nextWeekEnd.setDate(today.getDate() + 7);
-
-  return {
-    weekStart: weekStart.toISOString().split('T')[0]!,
-    weekEnd: weekEnd.toISOString().split('T')[0]!,
-    nextWeekEnd: nextWeekEnd.toISOString().split('T')[0]!,
-  };
-}
-
-/**
- * Get weekly review data from user's Notion
+ * Get weekly review data from user's Todoist
  */
 async function getWeeklyReviewData(user: {
-  notionAccessToken: string | null;
-  notionTasksDatabaseId: string | null;
-}, timezone: string): Promise<WeeklyReviewData | null> {
-  if (!user.notionAccessToken || !user.notionTasksDatabaseId) {
+  todoistAccessToken: string | null;
+}): Promise<WeeklyReviewData | null> {
+  if (!user.todoistAccessToken) {
     return null;
   }
 
-  const notion = createNotionClient(user.notionAccessToken);
-  const { weekStart, weekEnd, nextWeekEnd } = getWeekBounds(timezone);
+  const todoist = createTodoistClient(user.todoistAccessToken);
 
-  const [completedTasks, upcomingTasks, projects, waitingTasks, somedayTasks] = await Promise.all([
-    queryCompletedTasksInRange(notion, user.notionTasksDatabaseId, weekStart, weekEnd),
-    queryTasksDueInRange(notion, user.notionTasksDatabaseId, weekEnd, nextWeekEnd),
-    queryActiveProjects(notion, user.notionTasksDatabaseId),
-    queryWaitingTasks(notion, user.notionTasksDatabaseId),
-    querySomedayTasks(notion, user.notionTasksDatabaseId),
+  const [upcomingTasks, waitingTasks, overdueWaitingTasks, somedayTasks] = await Promise.all([
+    queryDueThisWeek(todoist),
+    queryWaiting(todoist),
+    queryOverdueWaiting(todoist),
+    queryByLabel(todoist, 'someday'),
   ]);
 
-  // Count overdue waiting tasks
-  const today = weekEnd;
-  const overdueWaiting = waitingTasks.filter((task) => {
-    const dueDate = extractTaskDueDate(task);
-    return dueDate && dueDate < today;
-  });
-
   return {
-    completedThisWeek: completedTasks.length,
-    completedTasks: completedTasks.slice(0, 5).map((t: unknown) => extractTaskTitle(t)),
-    activeProjectsCount: projects.length,
+    upcomingThisWeek: upcomingTasks.length,
+    topUpcoming: upcomingTasks.slice(0, 5).map(extractTaskTitle),
     waitingCount: waitingTasks.length,
-    overdueWaitingCount: overdueWaiting.length,
+    overdueWaitingCount: overdueWaitingTasks.length,
     somedayCount: somedayTasks.length,
-    upcomingNextWeek: upcomingTasks.length,
   };
 }
 
@@ -190,36 +155,32 @@ function formatWeeklyReviewMessage(data: WeeklyReviewData): string {
   const lines: string[] = ['📋 WEEKLY REVIEW'];
   lines.push('');
 
-  // Completed this week (wins)
-  if (data.completedThisWeek > 0) {
-    lines.push(`🎯 ${data.completedThisWeek} completed!`);
-    for (const task of data.completedTasks.slice(0, 3)) {
-      lines.push(`  ✓ ${truncate(task, 25)}`);
+  // Upcoming this week
+  if (data.upcomingThisWeek > 0) {
+    lines.push(`📅 ${data.upcomingThisWeek} due this week:`);
+    for (const task of data.topUpcoming.slice(0, 3)) {
+      lines.push(`  • ${truncate(task, 25)}`);
     }
-    if (data.completedThisWeek > 3) {
-      lines.push(`  (+${data.completedThisWeek - 3} more)`);
+    if (data.upcomingThisWeek > 3) {
+      lines.push(`  (+${data.upcomingThisWeek - 3} more)`);
     }
   } else {
-    lines.push('🎯 No tasks completed');
+    lines.push('📅 Nothing due this week!');
   }
 
   lines.push('');
 
-  // Summary stats
-  lines.push(`📁 ${data.activeProjectsCount} active project${data.activeProjectsCount !== 1 ? 's' : ''}`);
-
+  // Waiting status
   const waitingLine = data.overdueWaitingCount > 0
     ? `⏳ ${data.waitingCount} waiting (${data.overdueWaitingCount} overdue!)`
     : `⏳ ${data.waitingCount} waiting`;
   lines.push(waitingLine);
 
+  // Someday items
   lines.push(`💭 ${data.somedayCount} someday item${data.somedayCount !== 1 ? 's' : ''}`);
 
   lines.push('');
-  lines.push(`📅 ${data.upcomingNextWeek} due next week`);
-
-  lines.push('');
-  lines.push("Reply REVIEW for details.");
+  lines.push("Reply 'review' for details.");
 
   return lines.join('\n');
 }

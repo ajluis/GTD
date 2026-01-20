@@ -1,11 +1,28 @@
 import type { IntentEntities } from '@gtd/shared-types';
-import { PRIORITY_TO_NOTION, CONTEXT_TO_NOTION } from '@gtd/shared-types';
 import type { HandlerContext } from './intents.js';
 import {
-  createNotionClient,
-  findTaskByText,
-  extractTaskTitle,
-} from '@gtd/notion';
+  createTodoistClient,
+  searchTasks,
+  updateTask,
+  deleteTask,
+  type TodoistTaskResult,
+} from '@gtd/todoist';
+
+/**
+ * Extract title from Todoist task
+ */
+function extractTaskTitle(task: TodoistTaskResult): string {
+  return task.content;
+}
+
+/**
+ * Map GTD priority to Todoist priority (4=urgent, 1=normal)
+ */
+const PRIORITY_TO_TODOIST: Record<string, 1 | 2 | 3 | 4> = {
+  today: 4,      // Urgent (red)
+  this_week: 3,  // High (orange)
+  soon: 2,       // Medium (yellow)
+};
 
 /**
  * Handle reschedule_task intent
@@ -26,13 +43,13 @@ export async function handleRescheduleTask(
     return "What date? Try 'move [task] to Friday' or 'move [task] to next week'";
   }
 
-  if (!ctx.user.notionAccessToken || !ctx.user.notionTasksDatabaseId) {
-    return "Connect Notion first to edit tasks.";
+  if (!ctx.user.todoistAccessToken) {
+    return "Connect Todoist first to edit tasks.";
   }
 
   try {
-    const notion = createNotionClient(ctx.user.notionAccessToken);
-    const matchingTasks = await findTaskByText(notion, ctx.user.notionTasksDatabaseId, taskText);
+    const todoist = createTodoistClient(ctx.user.todoistAccessToken);
+    const matchingTasks = await searchTasks(todoist, taskText);
 
     if (matchingTasks.length === 0) {
       return `No task found matching "${taskText}".`;
@@ -41,14 +58,9 @@ export async function handleRescheduleTask(
     const task = matchingTasks[0]!;
     const title = extractTaskTitle(task);
 
-    // Update the task in Notion
-    await notion.pages.update({
-      page_id: task.id,
-      properties: {
-        Due: {
-          date: { start: dueDate },
-        },
-      } as any,
+    // Update the task in Todoist
+    await updateTask(todoist, task.id, {
+      due_date: dueDate,
     });
 
     // Format date for display
@@ -80,13 +92,13 @@ export async function handleSetTaskPriority(
     return "What priority? Try 'make [task] urgent' or 'mark [task] as today'";
   }
 
-  if (!ctx.user.notionAccessToken || !ctx.user.notionTasksDatabaseId) {
-    return "Connect Notion first to edit tasks.";
+  if (!ctx.user.todoistAccessToken) {
+    return "Connect Todoist first to edit tasks.";
   }
 
   try {
-    const notion = createNotionClient(ctx.user.notionAccessToken);
-    const matchingTasks = await findTaskByText(notion, ctx.user.notionTasksDatabaseId, taskText);
+    const todoist = createTodoistClient(ctx.user.todoistAccessToken);
+    const matchingTasks = await searchTasks(todoist, taskText);
 
     if (matchingTasks.length === 0) {
       return `No task found matching "${taskText}".`;
@@ -94,18 +106,16 @@ export async function handleSetTaskPriority(
 
     const task = matchingTasks[0]!;
     const title = extractTaskTitle(task);
-    const notionPriority = PRIORITY_TO_NOTION[priority];
+    const todoistPriority = PRIORITY_TO_TODOIST[priority] ?? 1;
 
-    await notion.pages.update({
-      page_id: task.id,
-      properties: {
-        Priority: {
-          select: { name: notionPriority },
-        },
-      } as any,
+    await updateTask(todoist, task.id, {
+      priority: todoistPriority,
     });
 
-    return `✅ "${title}" is now ${notionPriority}.`;
+    const priorityDisplay = priority === 'today' ? '🔴 Urgent' :
+                            priority === 'this_week' ? '🟠 High' : '🟡 Medium';
+
+    return `✅ "${title}" is now ${priorityDisplay}.`;
   } catch (error) {
     console.error('[Editing:priority] Error:', error);
     return "Couldn't update priority. Try again later.";
@@ -128,16 +138,16 @@ export async function handleSetTaskContext(
   }
 
   if (!context) {
-    return "What context? Options: @work, @home, @errands, @calls, @computer";
+    return "What context? Options: @computer, @phone, @out";
   }
 
-  if (!ctx.user.notionAccessToken || !ctx.user.notionTasksDatabaseId) {
-    return "Connect Notion first to edit tasks.";
+  if (!ctx.user.todoistAccessToken) {
+    return "Connect Todoist first to edit tasks.";
   }
 
   try {
-    const notion = createNotionClient(ctx.user.notionAccessToken);
-    const matchingTasks = await findTaskByText(notion, ctx.user.notionTasksDatabaseId, taskText);
+    const todoist = createTodoistClient(ctx.user.todoistAccessToken);
+    const matchingTasks = await searchTasks(todoist, taskText);
 
     if (matchingTasks.length === 0) {
       return `No task found matching "${taskText}".`;
@@ -145,18 +155,19 @@ export async function handleSetTaskContext(
 
     const task = matchingTasks[0]!;
     const title = extractTaskTitle(task);
-    const notionContext = CONTEXT_TO_NOTION[context];
 
-    await notion.pages.update({
-      page_id: task.id,
-      properties: {
-        Context: {
-          select: { name: notionContext },
-        },
-      } as any,
+    // Map context to label (home/outside -> out)
+    const contextLabel = context === 'home' || context === 'outside' ? 'out' : context;
+
+    // Update labels: remove old context labels, add new one
+    const existingLabels = task.labels.filter(l => !['computer', 'phone', 'out'].includes(l));
+    const newLabels = [...existingLabels, contextLabel];
+
+    await updateTask(todoist, task.id, {
+      labels: newLabels,
     });
 
-    return `✅ "${title}" is now ${notionContext}.`;
+    return `✅ "${title}" is now @${contextLabel}.`;
   } catch (error) {
     console.error('[Editing:context] Error:', error);
     return "Couldn't update context. Try again later.";
@@ -182,13 +193,13 @@ export async function handleAddTaskNote(
     return "What note? Try 'add note to [task]: [your note]'";
   }
 
-  if (!ctx.user.notionAccessToken || !ctx.user.notionTasksDatabaseId) {
-    return "Connect Notion first to edit tasks.";
+  if (!ctx.user.todoistAccessToken) {
+    return "Connect Todoist first to edit tasks.";
   }
 
   try {
-    const notion = createNotionClient(ctx.user.notionAccessToken);
-    const matchingTasks = await findTaskByText(notion, ctx.user.notionTasksDatabaseId, taskText);
+    const todoist = createTodoistClient(ctx.user.todoistAccessToken);
+    const matchingTasks = await searchTasks(todoist, taskText);
 
     if (matchingTasks.length === 0) {
       return `No task found matching "${taskText}".`;
@@ -197,19 +208,14 @@ export async function handleAddTaskNote(
     const task = matchingTasks[0]!;
     const title = extractTaskTitle(task);
 
-    // Get existing notes
-    const existingNotes = task.properties?.Notes?.rich_text?.[0]?.plain_text ?? '';
+    // Get existing description and append
+    const existingNotes = task.description ?? '';
     const newNotes = existingNotes
       ? `${existingNotes}\n---\n${noteContent}`
       : noteContent;
 
-    await notion.pages.update({
-      page_id: task.id,
-      properties: {
-        Notes: {
-          rich_text: [{ text: { content: newNotes } }],
-        },
-      } as any,
+    await updateTask(todoist, task.id, {
+      description: newNotes,
     });
 
     return `✅ Note added to "${title}".`;
@@ -238,13 +244,13 @@ export async function handleRenameTask(
     return "What's the new name? Try 'rename [task] to [new name]'";
   }
 
-  if (!ctx.user.notionAccessToken || !ctx.user.notionTasksDatabaseId) {
-    return "Connect Notion first to edit tasks.";
+  if (!ctx.user.todoistAccessToken) {
+    return "Connect Todoist first to edit tasks.";
   }
 
   try {
-    const notion = createNotionClient(ctx.user.notionAccessToken);
-    const matchingTasks = await findTaskByText(notion, ctx.user.notionTasksDatabaseId, taskText);
+    const todoist = createTodoistClient(ctx.user.todoistAccessToken);
+    const matchingTasks = await searchTasks(todoist, taskText);
 
     if (matchingTasks.length === 0) {
       return `No task found matching "${taskText}".`;
@@ -253,13 +259,8 @@ export async function handleRenameTask(
     const task = matchingTasks[0]!;
     const oldTitle = extractTaskTitle(task);
 
-    await notion.pages.update({
-      page_id: task.id,
-      properties: {
-        Task: {
-          title: [{ text: { content: newValue } }],
-        },
-      } as any,
+    await updateTask(todoist, task.id, {
+      content: newValue,
     });
 
     return `✅ Renamed "${oldTitle}" → "${newValue}"`;
@@ -283,13 +284,13 @@ export async function handleDeleteTask(
     return "Which task? Try 'delete [task]' or 'cancel [task]'";
   }
 
-  if (!ctx.user.notionAccessToken || !ctx.user.notionTasksDatabaseId) {
-    return "Connect Notion first to delete tasks.";
+  if (!ctx.user.todoistAccessToken) {
+    return "Connect Todoist first to delete tasks.";
   }
 
   try {
-    const notion = createNotionClient(ctx.user.notionAccessToken);
-    const matchingTasks = await findTaskByText(notion, ctx.user.notionTasksDatabaseId, taskText);
+    const todoist = createTodoistClient(ctx.user.todoistAccessToken);
+    const matchingTasks = await searchTasks(todoist, taskText);
 
     if (matchingTasks.length === 0) {
       return `No task found matching "${taskText}".`;
@@ -298,11 +299,8 @@ export async function handleDeleteTask(
     const task = matchingTasks[0]!;
     const title = extractTaskTitle(task);
 
-    // Archive the page (Notion's soft delete)
-    await notion.pages.update({
-      page_id: task.id,
-      archived: true,
-    });
+    // Delete the task
+    await deleteTask(todoist, task.id);
 
     return `🗑️ Deleted "${title}".`;
   } catch (error) {
@@ -331,8 +329,7 @@ export async function handleAssignTaskPerson(
   }
 
   // For now, return not implemented
-  // Full implementation would require finding the person's Notion page ID
-  // and updating the task's Person relation
+  // Full implementation would add the person's label to the task
   return `Task assignment coming soon! For now, you can mention the person when capturing: "ask ${personName} about [topic]"`;
 }
 

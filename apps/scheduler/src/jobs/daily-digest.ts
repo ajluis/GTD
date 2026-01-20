@@ -5,11 +5,11 @@ import { eq, and, isNotNull } from 'drizzle-orm';
 import { enqueueOutboundMessage } from '@gtd/queue';
 import type { MessageJobData } from '@gtd/queue';
 import {
-  createNotionClient,
-  queryTasksDueToday,
-  queryActiveActions,
-  extractTaskTitle,
-} from '@gtd/notion';
+  createTodoistClient,
+  queryDueToday,
+  queryHighPriority,
+  type TodoistTaskResult,
+} from '@gtd/todoist';
 
 /**
  * Daily Digest Job
@@ -17,7 +17,7 @@ import {
  * Sends morning summary to users based on their preferences:
  * - Runs every minute
  * - Checks which users have digestTime matching current time in their timezone
- * - Queries their Notion for today's tasks
+ * - Queries their Todoist for today's tasks
  * - Sends SMS summary
  */
 
@@ -25,6 +25,13 @@ interface DigestData {
   todayCount: number;
   actionCount: number;
   topTasks: string[];
+}
+
+/**
+ * Extract title from Todoist task
+ */
+function extractTaskTitle(task: TodoistTaskResult): string {
+  return task.content;
 }
 
 /**
@@ -42,8 +49,7 @@ export async function runDailyDigest(
   const activeUsers = await db.query.users.findMany({
     where: and(
       eq(users.status, 'active'),
-      isNotNull(users.notionAccessToken),
-      isNotNull(users.notionTasksDatabaseId)
+      isNotNull(users.todoistAccessToken)
     ),
   });
 
@@ -130,28 +136,27 @@ async function checkRecentDigest(_db: DbClient, _userId: string): Promise<boolea
 }
 
 /**
- * Get digest data from user's Notion
+ * Get digest data from user's Todoist
  */
 async function getDigestData(user: {
-  notionAccessToken: string | null;
-  notionTasksDatabaseId: string | null;
+  todoistAccessToken: string | null;
   timezone: string;
 }): Promise<DigestData | null> {
-  if (!user.notionAccessToken || !user.notionTasksDatabaseId) {
+  if (!user.todoistAccessToken) {
     return null;
   }
 
-  const notion = createNotionClient(user.notionAccessToken);
+  const todoist = createTodoistClient(user.todoistAccessToken);
 
-  const [todayTasks, allActions] = await Promise.all([
-    queryTasksDueToday(notion, user.notionTasksDatabaseId, user.timezone),
-    queryActiveActions(notion, user.notionTasksDatabaseId),
+  const [todayTasks, highPriorityTasks] = await Promise.all([
+    queryDueToday(todoist),
+    queryHighPriority(todoist),
   ]);
 
   return {
     todayCount: todayTasks.length,
-    actionCount: allActions.length,
-    topTasks: todayTasks.slice(0, 3).map((t: unknown) => extractTaskTitle(t)),
+    actionCount: highPriorityTasks.length,
+    topTasks: todayTasks.slice(0, 3).map(extractTaskTitle),
   };
 }
 
@@ -176,7 +181,7 @@ function formatDigestMessage(data: DigestData): string {
   }
 
   if (data.actionCount > data.todayCount) {
-    lines.push(`\n${data.actionCount} total actions in queue.`);
+    lines.push(`\n${data.actionCount} total high-priority actions.`);
   }
 
   lines.push("\nText 'today' for full list.");

@@ -235,7 +235,7 @@ export const removePerson: Tool = {
         aliases: person.aliases,
         frequency: person.frequency,
         dayOfWeek: person.dayOfWeek,
-        notionPageId: person.notionPageId,
+        todoistLabel: person.todoistLabel,
       };
 
       // Soft delete (mark inactive) rather than hard delete

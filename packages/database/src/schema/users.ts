@@ -34,6 +34,14 @@ export const users = pgTable(
     /** Notion bot ID from OAuth */
     notionBotId: text('notion_bot_id'),
 
+    // Todoist Integration (replaces Notion)
+    /** Todoist OAuth access token */
+    todoistAccessToken: text('todoist_access_token'),
+    /** Todoist user ID from OAuth */
+    todoistUserId: text('todoist_user_id'),
+    // Note: Project IDs are NOT stored - we query Todoist each time
+    // This ensures we always have the current structure and adapt to user changes
+
     // User Preferences
     /** User's timezone (IANA format) */
     timezone: text('timezone').default('America/New_York').notNull(),

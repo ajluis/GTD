@@ -1,17 +1,32 @@
 import { users, people, tasks } from '@gtd/database';
 import { eq, desc } from 'drizzle-orm';
 import {
-  createNotionClient,
-  findTaskByText,
+  createTodoistClient,
+  searchTasks,
   completeTask,
-  queryAgendaForPerson,
-  markDiscussed,
-  extractTaskTitle,
-  isTaskDueToday,
-} from '@gtd/notion';
+  queryPersonAgenda,
+  type TodoistTaskResult,
+} from '@gtd/todoist';
 import { formatTaskComplete } from '@gtd/gtd';
 import type { IntentEntities } from '@gtd/shared-types';
 import type { HandlerContext } from './intents.js';
+
+/**
+ * Extract title from Todoist task (just the content field)
+ */
+function extractTaskTitle(task: TodoistTaskResult): string {
+  return task.content;
+}
+
+/**
+ * Check if a task is due today
+ */
+function isTaskDueToday(task: TodoistTaskResult, timezone: string): boolean {
+  if (!task.due?.date) return false;
+  const now = new Date();
+  const today = now.toLocaleDateString('en-CA', { timeZone: timezone });
+  return task.due.date === today;
+}
 
 /**
  * Handle complete_task intent
@@ -26,13 +41,13 @@ export async function handleCompleteTask(
     return "What did you complete? Try 'finished [task]' or 'done [task]'";
   }
 
-  if (!ctx.user.notionAccessToken || !ctx.user.notionTasksDatabaseId) {
-    return "Connect Notion first to mark tasks complete.";
+  if (!ctx.user.todoistAccessToken) {
+    return "Connect Todoist first to mark tasks complete.";
   }
 
   try {
-    const notion = createNotionClient(ctx.user.notionAccessToken);
-    const matchingTasks = await findTaskByText(notion, ctx.user.notionTasksDatabaseId, searchText);
+    const todoist = createTodoistClient(ctx.user.todoistAccessToken);
+    const matchingTasks = await searchTasks(todoist, searchText);
 
     if (matchingTasks.length === 0) {
       return `No matching task found for "${searchText}".\n\nTry a different search term.`;
@@ -42,9 +57,9 @@ export async function handleCompleteTask(
       // Exact match - complete it
       const task = matchingTasks[0]!;
       const title = extractTaskTitle(task);
-      const wasDueToday = isTaskDueToday(task);
+      const wasDueToday = isTaskDueToday(task, ctx.user.timezone);
 
-      await completeTask(notion, task.id);
+      await completeTask(todoist, task.id);
 
       // Update local DB stats
       const newCompletedCount = (ctx.user.totalTasksCompleted ?? 0) + 1;
@@ -94,13 +109,13 @@ export async function handleCompleteRecent(ctx: HandlerContext): Promise<string>
     return `"${recentTask.title}" is already done!`;
   }
 
-  if (!ctx.user.notionAccessToken || !recentTask.notionPageId) {
-    return "Connect Notion first to mark tasks complete.";
+  if (!ctx.user.todoistAccessToken || !recentTask.todoistTaskId) {
+    return "Connect Todoist first to mark tasks complete.";
   }
 
   try {
-    const notion = createNotionClient(ctx.user.notionAccessToken);
-    await completeTask(notion, recentTask.notionPageId);
+    const todoist = createTodoistClient(ctx.user.todoistAccessToken);
+    await completeTask(todoist, recentTask.todoistTaskId);
 
     // Update local task
     await ctx.db
@@ -155,23 +170,25 @@ export async function handleCompletePersonAgenda(
     return `I don't have "${personName}" in your people list.\n\nAdd them with 'track ${personName}'`;
   }
 
-  if (!ctx.user.notionAccessToken || !ctx.user.notionTasksDatabaseId || !person.notionPageId) {
-    return "Connect Notion first to process agenda items.";
+  if (!ctx.user.todoistAccessToken) {
+    return "Connect Todoist first to process agenda items.";
   }
 
   try {
-    const notion = createNotionClient(ctx.user.notionAccessToken);
-    const agendaItems = await queryAgendaForPerson(notion, ctx.user.notionTasksDatabaseId, person.notionPageId);
+    const todoist = createTodoistClient(ctx.user.todoistAccessToken);
+    // Person label is lowercase with underscores
+    const personLabel = person.name.toLowerCase().replace(/\s+/g, '_');
+    const agendaItems = await queryPersonAgenda(todoist, personLabel);
 
     if (agendaItems.length === 0) {
       return `✅ No pending agenda items for ${person.name}.\n\nGreat meeting! 🎉`;
     }
 
-    // Mark all items as discussed
+    // Mark all items as discussed (complete them)
     const itemTitles = agendaItems.map((item, i) => `${i + 1}. ${extractTaskTitle(item)}`);
 
     for (const item of agendaItems) {
-      await markDiscussed(notion, item.id);
+      await completeTask(todoist, item.id);
     }
 
     return `👥 ${person.name} - ${agendaItems.length} items discussed:\n${itemTitles.join('\n')}\n\n✅ All marked as discussed!`;

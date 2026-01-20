@@ -16,7 +16,7 @@ export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
 export type MessageJobType =
   | 'inbound' // Process incoming SMS
   | 'classify' // AI classification
-  | 'notion-sync' // Sync task to Notion
+  | 'todoist-sync' // Sync task to Todoist
   | 'outbound'; // Send SMS reply
 
 /**
@@ -50,17 +50,20 @@ export interface ClassifyJobData {
 }
 
 /**
- * Notion Sync Job Data
- * Sync classified task to Notion database
+ * Todoist Sync Job Data
+ * Sync classified task to Todoist
  */
-export interface NotionSyncJobData {
-  type: 'notion-sync';
+export interface TodoistSyncJobData {
+  type: 'todoist-sync';
   /** User ID */
   userId: string;
   /** Task ID from local database */
   taskId: string;
-  /** Classification result */
-  classification: ClassificationResult;
+  /** Classification result with target project */
+  classification: ClassificationResult & {
+    /** Target Todoist project name (discovered dynamically) */
+    targetProject?: string;
+  };
 }
 
 /**
@@ -85,7 +88,7 @@ export interface OutboundMessageJobData {
 export type MessageJobData =
   | InboundMessageJobData
   | ClassifyJobData
-  | NotionSyncJobData
+  | TodoistSyncJobData
   | OutboundMessageJobData;
 
 /**

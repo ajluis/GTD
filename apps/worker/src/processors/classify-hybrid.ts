@@ -9,7 +9,7 @@
 
 import type { Job } from 'bullmq';
 import type { ClassifyJobData, MessageJobData } from '@gtd/queue';
-import { enqueueNotionSync, enqueueOutboundMessage } from '@gtd/queue';
+import { enqueueTodoistSync, enqueueOutboundMessage } from '@gtd/queue';
 import type { Queue } from 'bullmq';
 import type { DbClient } from '@gtd/database';
 import { users, messages, tasks, people } from '@gtd/database';
@@ -30,7 +30,13 @@ import {
 
 // Legacy imports for direct execution
 import { formatTaskCapture, formatHelp } from '@gtd/gtd';
-import { createNotionClient } from '@gtd/notion';
+
+// Todoist imports for dynamic project routing
+import {
+  createTodoistClient,
+  discoverTodoistStructure,
+  getProjectNames,
+} from '@gtd/todoist';
 
 /**
  * Hybrid Classification Processor
@@ -68,12 +74,27 @@ export function createHybridClassifyProcessor(
       content: m.content,
     }));
 
-    // 3. Fast classification
+    // 2.5. Get Todoist project names for AI routing (if user connected)
+    let availableProjects: string[] = [];
+    if (user.todoistAccessToken) {
+      try {
+        const todoist = createTodoistClient(user.todoistAccessToken);
+        const structure = await discoverTodoistStructure(todoist);
+        availableProjects = getProjectNames(structure);
+        console.log(`[HybridClassify] Discovered ${availableProjects.length} Todoist projects for routing`);
+      } catch (error) {
+        console.warn('[HybridClassify] Could not fetch Todoist projects:', error);
+        // Continue without project routing - tasks will go to Inbox
+      }
+    }
+
+    // 3. Fast classification with available projects
     const classification = await fastClassifier.classify({
       message: content,
       timezone: user.timezone,
       currentTime: new Date(),
       recentMessages: recentContext,
+      availableProjects,
     });
 
     console.log(`[HybridClassify] Result: ${classification.type} (needsDataLookup: ${classification.needsDataLookup})`);
@@ -194,8 +215,8 @@ async function handleMultiItem(
         })
         .returning();
 
-      // Queue for Notion sync
-      await enqueueNotionSync(messageQueue, {
+      // Queue for Todoist sync with project routing
+      await enqueueTodoistSync(messageQueue, {
         userId: user.id,
         taskId: task!.id,
         classification: {
@@ -205,6 +226,7 @@ async function handleMultiItem(
           context: item.context as any,
           priority: item.priority as any,
           dueDate: item.dueDate,
+          targetProject: item.targetProject,
         },
       });
 
@@ -327,8 +349,8 @@ async function handleDirectExecution(
       })
       .where(eq(users.id, user.id));
 
-    // Queue for Notion sync
-    await enqueueNotionSync(messageQueue, {
+    // Queue for Todoist sync with project routing
+    await enqueueTodoistSync(messageQueue, {
       userId: user.id,
       taskId: created!.id,
       classification: {
@@ -338,6 +360,7 @@ async function handleDirectExecution(
         context: task.context as any,
         priority: task.priority as any,
         dueDate: task.dueDate,
+        targetProject: task.targetProject,
       },
     });
 
@@ -390,11 +413,9 @@ async function handleWithTools(
   const toolContext: ToolContext = {
     userId: user.id,
     db,
-    notionClient: user.notionAccessToken
-      ? createNotionClient(user.notionAccessToken)
+    todoistClient: user.todoistAccessToken
+      ? createTodoistClient(user.todoistAccessToken)
       : null,
-    notionTasksDatabaseId: user.notionTasksDatabaseId,
-    notionPeopleDatabaseId: user.notionPeopleDatabaseId,
     timezone: user.timezone,
     conversationContext,
   };

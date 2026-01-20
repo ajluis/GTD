@@ -66,6 +66,16 @@ export class TodoistClient {
   async delete(endpoint: string): Promise<void> {
     await this.request(endpoint, { method: 'DELETE' });
   }
+
+  /**
+   * POST request (for updates - Todoist uses POST for task updates)
+   */
+  async update<T>(endpoint: string, data: unknown): Promise<T> {
+    return this.request<T>(endpoint, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
 }
 
 /**

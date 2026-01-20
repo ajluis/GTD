@@ -66,9 +66,14 @@ export interface HandlerContext {
   user: {
     id: string;
     phoneNumber: string;
+    // Todoist Integration
+    todoistAccessToken: string | null;
+    todoistUserId: string | null;
+    // Legacy Notion fields (keeping for compatibility during migration)
     notionAccessToken: string | null;
     notionTasksDatabaseId: string | null;
     notionPeopleDatabaseId: string | null;
+    // Preferences
     timezone: string;
     digestTime: string;
     meetingReminderHours: number;

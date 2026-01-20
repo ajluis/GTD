@@ -1,25 +1,23 @@
 import { people, conversationStates } from '@gtd/database';
 import { eq } from 'drizzle-orm';
 import {
-  createNotionClient,
-  queryTasksDueToday,
-  queryTasksByContext,
-  queryAgendaForPerson,
+  createTodoistClient,
+  queryDueToday,
+  queryByContext,
+  queryPersonAgenda,
   completeTask,
-  markDiscussed,
-  extractTaskTitle,
-} from '@gtd/notion';
+  type TodoistTaskResult,
+} from '@gtd/todoist';
 import { formatHelp } from '@gtd/gtd';
 import type { IntentEntities, BatchConfirmationData, TaskContext } from '@gtd/shared-types';
 import type { HandlerContext } from './intents.js';
 
-// Map internal context names to Notion format
-const CONTEXT_TO_NOTION: Record<TaskContext, string> = {
-  computer: 'computer',
-  phone: 'phone',
-  home: 'home',
-  outside: 'outside',
-};
+/**
+ * Extract title from Todoist task
+ */
+function extractTaskTitle(task: TodoistTaskResult): string {
+  return task.content;
+}
 
 /**
  * Handle clear_person_agenda intent
@@ -50,17 +48,15 @@ export async function handleClearPersonAgenda(
     return `I don't have "${personName}" in your people list.`;
   }
 
-  if (!ctx.user.notionAccessToken || !ctx.user.notionTasksDatabaseId || !person.notionPageId) {
-    return "Connect Notion first to manage agenda items.";
+  if (!ctx.user.todoistAccessToken) {
+    return "Connect Todoist first to manage agenda items.";
   }
 
   try {
-    const notion = createNotionClient(ctx.user.notionAccessToken);
-    const agendaItems = await queryAgendaForPerson(
-      notion,
-      ctx.user.notionTasksDatabaseId,
-      person.notionPageId
-    );
+    const todoist = createTodoistClient(ctx.user.todoistAccessToken);
+    // Person label is lowercase with underscores
+    const personLabel = person.name.toLowerCase().replace(/\s+/g, '_');
+    const agendaItems = await queryPersonAgenda(todoist, personLabel);
 
     if (agendaItems.length === 0) {
       return `${person.name} has no pending agenda items.`;
@@ -68,7 +64,7 @@ export async function handleClearPersonAgenda(
 
     // Single item - clear immediately
     if (agendaItems.length === 1) {
-      await markDiscussed(notion, agendaItems[0]!.id);
+      await completeTask(todoist, agendaItems[0]!.id);
       return `✅ Cleared 1 agenda item for ${person.name}.`;
     }
 
@@ -108,13 +104,13 @@ export async function handleClearPersonAgenda(
  * "mark everything today as done", "all done for today"
  */
 export async function handleCompleteAllToday(ctx: HandlerContext): Promise<string> {
-  if (!ctx.user.notionAccessToken || !ctx.user.notionTasksDatabaseId) {
-    return "Connect Notion first to complete tasks.";
+  if (!ctx.user.todoistAccessToken) {
+    return "Connect Todoist first to complete tasks.";
   }
 
   try {
-    const notion = createNotionClient(ctx.user.notionAccessToken);
-    const todayTasks = await queryTasksDueToday(notion, ctx.user.notionTasksDatabaseId, ctx.user.timezone);
+    const todoist = createTodoistClient(ctx.user.todoistAccessToken);
+    const todayTasks = await queryDueToday(todoist);
 
     if (todayTasks.length === 0) {
       return "No tasks due today to complete!";
@@ -123,7 +119,7 @@ export async function handleCompleteAllToday(ctx: HandlerContext): Promise<strin
     // Single task - complete immediately
     if (todayTasks.length === 1) {
       const task = todayTasks[0]!;
-      await completeTask(notion, task.id);
+      await completeTask(todoist, task.id);
       return `✅ "${extractTaskTitle(task)}" — done!`;
     }
 
@@ -171,17 +167,15 @@ export async function handleCompleteAllContext(
     return "Which context? Try 'done with @computer', 'finished all @errands', etc.";
   }
 
-  if (!ctx.user.notionAccessToken || !ctx.user.notionTasksDatabaseId) {
-    return "Connect Notion first to complete tasks.";
+  if (!ctx.user.todoistAccessToken) {
+    return "Connect Todoist first to complete tasks.";
   }
 
   try {
-    const notion = createNotionClient(ctx.user.notionAccessToken);
-    const contextTasks = await queryTasksByContext(
-      notion,
-      ctx.user.notionTasksDatabaseId,
-      CONTEXT_TO_NOTION[context]
-    );
+    const todoist = createTodoistClient(ctx.user.todoistAccessToken);
+    // Map context to label (home/outside -> out)
+    const contextLabel = context === 'home' || context === 'outside' ? 'out' : context;
+    const contextTasks = await queryByContext(todoist, contextLabel);
 
     if (contextTasks.length === 0) {
       return `No @${context} tasks to complete!`;
@@ -190,7 +184,7 @@ export async function handleCompleteAllContext(
     // Single task - complete immediately
     if (contextTasks.length === 1) {
       const task = contextTasks[0]!;
-      await completeTask(notion, task.id);
+      await completeTask(todoist, task.id);
       return `✅ "${extractTaskTitle(task)}" — done!`;
     }
 

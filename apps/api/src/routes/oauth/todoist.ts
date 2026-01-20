@@ -3,33 +3,33 @@ import {
   getAuthorizationUrl,
   exchangeCodeForToken,
   createOAuthConfig,
-  NotionOAuthError,
-  createNotionClient,
-  setupNotionDatabases,
-} from '@gtd/notion';
+  getUserInfo,
+  TodoistOAuthError,
+} from '@gtd/todoist';
 import { users } from '@gtd/database';
 import { eq } from 'drizzle-orm';
 import type { DbClient } from '@gtd/database';
 
 /**
- * Notion OAuth configuration
+ * Todoist OAuth configuration
  */
-interface NotionOAuthRoutesConfig {
+interface TodoistOAuthRoutesConfig {
   db: DbClient;
   appUrl: string;
 }
 
 /**
- * Notion OAuth routes
+ * Todoist OAuth routes
  *
- * Handles the OAuth flow for connecting user's Notion workspace.
+ * Handles the OAuth flow for connecting user's Todoist account.
+ * This replaces Notion as the primary task storage backend.
  */
-export function createNotionOAuthRoutes(config: NotionOAuthRoutesConfig): FastifyPluginAsync {
+export function createTodoistOAuthRoutes(config: TodoistOAuthRoutesConfig): FastifyPluginAsync {
   const oauthConfig = createOAuthConfig();
 
   return async (fastify) => {
     /**
-     * GET /oauth/notion/authorize
+     * GET /oauth/todoist/authorize
      *
      * Initiates OAuth flow. Called when user clicks auth link in SMS.
      * Expects ?phone= query param to identify the user.
@@ -52,15 +52,15 @@ export function createNotionOAuthRoutes(config: NotionOAuthRoutesConfig): Fastif
 
         const authUrl = getAuthorizationUrl(oauthConfig, state);
 
-        // Redirect to Notion authorization page
+        // Redirect to Todoist authorization page
         return reply.redirect(authUrl);
       }
     );
 
     /**
-     * GET /oauth/notion/callback
+     * GET /oauth/todoist/callback
      *
-     * OAuth callback from Notion after user authorizes.
+     * OAuth callback from Todoist after user authorizes.
      */
     fastify.get<{
       Querystring: { code?: string; state?: string; error?: string };
@@ -69,10 +69,10 @@ export function createNotionOAuthRoutes(config: NotionOAuthRoutesConfig): Fastif
 
       // Handle OAuth errors
       if (error) {
-        fastify.log.error({ error }, 'Notion OAuth error');
+        fastify.log.error({ error }, 'Todoist OAuth error');
         return reply.status(400).send({
           error: 'OAuth Error',
-          message: 'Failed to authorize with Notion. Please try again.',
+          message: 'Failed to authorize with Todoist. Please try again.',
         });
       }
 
@@ -98,36 +98,28 @@ export function createNotionOAuthRoutes(config: NotionOAuthRoutesConfig): Fastif
         // 1. Exchange code for access token
         const tokenResponse = await exchangeCodeForToken(oauthConfig, code);
 
-        fastify.log.info(
-          {
-            workspaceId: tokenResponse.workspace_id,
-            workspaceName: tokenResponse.workspace_name,
-          },
-          'Notion OAuth successful'
-        );
+        fastify.log.info('Todoist OAuth token exchange successful');
 
-        // 2. Set up Notion databases
-        const notion = createNotionClient(tokenResponse.access_token);
-        const dbSetup = await setupNotionDatabases(notion);
+        // 2. Get user info from Todoist
+        const userInfo = await getUserInfo(tokenResponse.access_token);
 
         fastify.log.info(
           {
-            tasksDbId: dbSetup.tasksDbId,
-            peopleDbId: dbSetup.peopleDbId,
+            todoistUserId: userInfo.id,
+            todoistEmail: userInfo.email,
+            todoistTimezone: userInfo.timezone,
           },
-          'Notion databases created'
+          'Todoist user info retrieved'
         );
 
         // 3. Update user record
         await config.db
           .update(users)
           .set({
-            notionAccessToken: tokenResponse.access_token,
-            notionWorkspaceId: tokenResponse.workspace_id,
-            notionWorkspaceName: tokenResponse.workspace_name,
-            notionBotId: tokenResponse.bot_id,
-            notionTasksDatabaseId: dbSetup.tasksDbId,
-            notionPeopleDatabaseId: dbSetup.peopleDbId,
+            todoistAccessToken: tokenResponse.access_token,
+            todoistUserId: userInfo.id,
+            // Optionally update timezone from Todoist if user hasn't set one
+            // timezone: userInfo.timezone,
             status: 'active',
             onboardingStep: 'complete',
             updatedAt: new Date(),
@@ -135,7 +127,6 @@ export function createNotionOAuthRoutes(config: NotionOAuthRoutesConfig): Fastif
           .where(eq(users.phoneNumber, phoneNumber));
 
         // 4. Show success page
-        // In production, you'd want a nicer HTML page
         return reply.type('text/html').send(`
           <!DOCTYPE html>
           <html>
@@ -150,7 +141,7 @@ export function createNotionOAuthRoutes(config: NotionOAuthRoutesConfig): Fastif
                 align-items: center;
                 min-height: 100vh;
                 margin: 0;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                background: linear-gradient(135deg, #e44332 0%, #db4c3f 100%);
                 color: white;
                 text-align: center;
                 padding: 20px;
@@ -168,21 +159,21 @@ export function createNotionOAuthRoutes(config: NotionOAuthRoutesConfig): Fastif
           </head>
           <body>
             <div class="card">
-              <h1>🎉</h1>
-              <h2>Connected to Notion!</h2>
-              <p>Your workspace "${tokenResponse.workspace_name}" is now linked to GTD.</p>
+              <h1>✅</h1>
+              <h2>Connected to Todoist!</h2>
+              <p>Hi ${userInfo.full_name}! Your Todoist is now linked to GTD.</p>
               <p>You can close this page and go back to SMS.</p>
             </div>
           </body>
           </html>
         `);
       } catch (error) {
-        fastify.log.error({ error }, 'Notion OAuth callback failed');
+        fastify.log.error({ error }, 'Todoist OAuth callback failed');
 
-        if (error instanceof NotionOAuthError) {
+        if (error instanceof TodoistOAuthError) {
           return reply.status(400).send({
             error: 'OAuth Error',
-            message: 'Failed to complete Notion authorization. Please try again.',
+            message: 'Failed to complete Todoist authorization. Please try again.',
           });
         }
 
