@@ -6,6 +6,8 @@
  */
 
 import type { DbClient } from '@gtd/database';
+import { userPatterns } from '@gtd/database/schema';
+import { eq } from 'drizzle-orm';
 import type {
   InteractionForLearning,
   LearningResult,
@@ -383,9 +385,6 @@ export class LearningEngine {
     commonLabels: string[];
   }> {
     try {
-      const { userPatterns } = await import('@gtd/database/schema');
-      const { eq } = await import('drizzle-orm');
-
       const result = await this.db.query.userPatterns.findFirst({
         where: eq(userPatterns.userId, userId),
       });
@@ -432,8 +431,6 @@ export class LearningEngine {
     }
   ): Promise<void> {
     try {
-      const { userPatterns } = await import('@gtd/database/schema');
-
       // Convert for storage
       const wordAssociationsForDb = patterns.wordAssociations.map((a) => ({
         trigger: a.trigger,

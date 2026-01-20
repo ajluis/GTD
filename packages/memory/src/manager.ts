@@ -6,6 +6,8 @@
  */
 
 import type { DbClient } from '@gtd/database';
+import { conversationMemory } from '@gtd/database/schema';
+import { eq, gte, desc, and, inArray, lt, gt, sql } from 'drizzle-orm';
 import type {
   Memory,
   MemoryType,
@@ -55,8 +57,6 @@ export class MemoryManager {
     const { userId, type, content, entities = [], relevanceScore = 50 } = request;
 
     try {
-      const { conversationMemory } = await import('@gtd/database/schema');
-
       const result = await this.db
         .insert(conversationMemory)
         .values({
@@ -147,9 +147,6 @@ export class MemoryManager {
     } = request;
 
     try {
-      const { conversationMemory } = await import('@gtd/database/schema');
-      const { eq, gte, desc, and, inArray } = await import('drizzle-orm');
-
       // Build query conditions
       const conditions = [
         eq(conversationMemory.userId, userId),
@@ -193,7 +190,7 @@ export class MemoryManager {
       // Sort by match score and return top results
       const topResults = scored
         .filter((m) => m.matchScore > 0)
-        .sort((a, b) => b.matchScore - a.matchScore)
+        .sort((a: RetrievedMemory, b: RetrievedMemory) => b.matchScore - a.matchScore)
         .slice(0, limit);
 
       // Update retrieval stats for returned memories
@@ -415,9 +412,6 @@ export class MemoryManager {
     if (memoryIds.length === 0) return;
 
     try {
-      const { conversationMemory } = await import('@gtd/database/schema');
-      const { inArray, sql } = await import('drizzle-orm');
-
       await this.db
         .update(conversationMemory)
         .set({
@@ -435,9 +429,6 @@ export class MemoryManager {
    */
   private async cleanupOldMemories(userId: string): Promise<void> {
     try {
-      const { conversationMemory } = await import('@gtd/database/schema');
-      const { eq, desc, lt, and } = await import('drizzle-orm');
-
       // Count existing memories
       const countResult = await this.db
         .select({ count: conversationMemory.id })
@@ -467,7 +458,6 @@ export class MemoryManager {
         .limit(toDelete);
 
       if (oldMemories.length > 0) {
-        const { inArray } = await import('drizzle-orm');
         await this.db
           .delete(conversationMemory)
           .where(inArray(conversationMemory.id, oldMemories.map((m) => m.id)));
@@ -484,9 +474,6 @@ export class MemoryManager {
    */
   async decayRelevanceScores(): Promise<void> {
     try {
-      const { conversationMemory } = await import('@gtd/database/schema');
-      const { sql, gt } = await import('drizzle-orm');
-
       // Apply decay to all memories with relevance > 20
       await this.db
         .update(conversationMemory)

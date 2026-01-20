@@ -11,6 +11,8 @@
  */
 
 import type { DbClient } from '@gtd/database';
+import { userPreferences, userPatterns, todoistEntityCache, people } from '@gtd/database/schema';
+import { eq } from 'drizzle-orm';
 import type {
   UserContext,
   UserPreferences,
@@ -511,10 +513,6 @@ export class ContextManager {
    */
   private async loadPreferencesFromDb(userId: string): Promise<UserPreferences> {
     try {
-      // Dynamic import to avoid circular dependencies
-      const { userPreferences } = await import('@gtd/database/schema');
-      const { eq } = await import('drizzle-orm');
-
       const result = await this.db.query.userPreferences.findFirst({
         where: eq(userPreferences.userId, userId),
       });
@@ -552,8 +550,6 @@ export class ContextManager {
    */
   private async savePreferencesToDb(userId: string, prefs: UserPreferences): Promise<void> {
     try {
-      const { userPreferences } = await import('@gtd/database/schema');
-
       await this.db
         .insert(userPreferences)
         .values({
@@ -590,9 +586,6 @@ export class ContextManager {
    */
   private async loadPatternsFromDb(userId: string): Promise<LearnedPatterns> {
     try {
-      const { userPatterns } = await import('@gtd/database/schema');
-      const { eq } = await import('drizzle-orm');
-
       const result = await this.db.query.userPatterns.findFirst({
         where: eq(userPatterns.userId, userId),
       });
@@ -623,8 +616,6 @@ export class ContextManager {
    */
   private async savePatternsToDb(userId: string, patterns: LearnedPatterns): Promise<void> {
     try {
-      const { userPatterns } = await import('@gtd/database/schema');
-
       // Convert dates to ISO strings for storage
       const wordAssociationsForDb = patterns.wordAssociations.map((a) => ({
         ...a,
@@ -665,9 +656,6 @@ export class ContextManager {
    */
   private async loadEntitiesFromDb(userId: string): Promise<UserEntities> {
     try {
-      const { todoistEntityCache, people } = await import('@gtd/database/schema');
-      const { eq } = await import('drizzle-orm');
-
       // Load cached Todoist entities
       const cached = await this.db.query.todoistEntityCache.findFirst({
         where: eq(todoistEntityCache.userId, userId),
@@ -719,8 +707,6 @@ export class ContextManager {
    */
   private async saveEntitiesToDb(userId: string, entities: UserEntities): Promise<void> {
     try {
-      const { todoistEntityCache } = await import('@gtd/database/schema');
-
       // Save Todoist entity cache
       // Expires in 5 minutes
       const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
