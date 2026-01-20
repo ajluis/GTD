@@ -182,14 +182,22 @@ function buildFullPrompt(
   const toolInstructions = hasToolResults
     ? `
 ═══════════════════════════════════════════════════════════════
-IMPORTANT: TOOL RESULTS RECEIVED - RESPOND WITH TEXT NOW
+CRITICAL: RESPOND WITH PLAIN TEXT ONLY - NO JSON
 ═══════════════════════════════════════════════════════════════
 
-You have received tool results. Now provide a FINAL TEXT RESPONSE to the user.
-DO NOT call any more tools. Respond with plain text summarizing what you found.
+Tool results are above. Now write a SHORT, PLAIN TEXT response for SMS.
 
-If no results matched, say so helpfully. If results were found, present them clearly.
-Keep the response SMS-friendly (under 320 characters when possible).
+RULES:
+- DO NOT use JSON format
+- DO NOT wrap response in quotes or braces
+- DO NOT include field names like "response:" or "message:"
+- Just write plain text like a human would text back
+- Keep it under 320 characters
+- Use emojis sparingly: ✅ ⏳ 👤
+
+GOOD: "✅ Added: Buy groceries"
+BAD: {"response": "Added: Buy groceries"}
+BAD: "response": "Added: Buy groceries"
 `
     : `
 ═══════════════════════════════════════════════════════════════
@@ -273,9 +281,27 @@ function parseResponse(
         };
       }
 
-      // Handle {"response": "..."} format - extract the text
-      if (parsed.response && typeof parsed.response === 'string') {
-        return { type: 'text', content: parsed.response };
+      // Handle various text response formats from LLM
+      // Try common field names for text responses
+      const textFields = ['response', 'message', 'text', 'content', 'reply', 'answer'];
+      for (const field of textFields) {
+        if (parsed[field] && typeof parsed[field] === 'string') {
+          return { type: 'text', content: parsed[field] };
+        }
+      }
+
+      // If it's a JSON object but not tool_calls and no text field found,
+      // it might be structured data the LLM returned incorrectly.
+      // Try to extract a meaningful summary or return as formatted text
+      if (typeof parsed === 'object' && parsed !== null) {
+        // Check if it looks like task data being returned raw
+        if (parsed.title || parsed.task || parsed.name) {
+          const taskName = parsed.title || parsed.task || parsed.name;
+          return { type: 'text', content: `Added: ${taskName}` };
+        }
+
+        // Last resort: don't return raw JSON, ask for clarification
+        console.warn('[AgentLoop] LLM returned unexpected JSON structure:', Object.keys(parsed));
       }
     }
   } catch {
