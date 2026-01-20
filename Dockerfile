@@ -23,6 +23,9 @@ COPY packages/sendblue/package.json ./packages/sendblue/
 COPY packages/ai/package.json ./packages/ai/
 COPY packages/gtd/package.json ./packages/gtd/
 COPY packages/todoist/package.json ./packages/todoist/
+COPY packages/mcp/package.json ./packages/mcp/
+COPY packages/context/package.json ./packages/context/
+COPY packages/memory/package.json ./packages/memory/
 COPY apps/api/package.json ./apps/api/
 COPY apps/worker/package.json ./apps/worker/
 COPY apps/scheduler/package.json ./apps/scheduler/
