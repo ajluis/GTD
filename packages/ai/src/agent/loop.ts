@@ -266,17 +266,29 @@ function parseResponse(
     }
     jsonStr = jsonStr.trim();
 
-    // Only try to parse if it looks like JSON
-    if (jsonStr.startsWith('{')) {
+    // Only try to parse if it looks like JSON (object or array)
+    if (jsonStr.startsWith('{') || jsonStr.startsWith('[')) {
       const parsed = JSON.parse(jsonStr);
 
-      // Handle tool_calls format
+      // Handle array format: [{"tool": "...", "parameters": {...}}]
+      // This is what Gemini sometimes returns
+      if (Array.isArray(parsed) && parsed.length > 0 && (parsed[0].tool || parsed[0].name)) {
+        return {
+          type: 'tool_calls',
+          calls: parsed.map((call: any) => ({
+            name: call.name || call.tool, // Handle both "name" and "tool" keys
+            parameters: call.parameters || call.params || {},
+          })),
+        };
+      }
+
+      // Handle object format: {"tool_calls": [{"name": "...", "parameters": {...}}]}
       if (parsed.tool_calls && Array.isArray(parsed.tool_calls)) {
         return {
           type: 'tool_calls',
           calls: parsed.tool_calls.map((call: any) => ({
-            name: call.name,
-            parameters: call.parameters || {},
+            name: call.name || call.tool,
+            parameters: call.parameters || call.params || {},
           })),
         };
       }
