@@ -312,8 +312,36 @@ function parseResponse(
           return { type: 'text', content: `Added: ${taskName}` };
         }
 
+        // Check if it looks like a tasks list (common for lookups)
+        if (parsed.tasks && Array.isArray(parsed.tasks)) {
+          const tasks = parsed.tasks as Array<{ title?: string; content?: string; name?: string }>;
+          if (tasks.length === 0) {
+            return { type: 'text', content: '✅ No tasks found.' };
+          }
+          const taskList = tasks
+            .slice(0, 10) // Limit to 10 for SMS
+            .map((t, i) => `${i + 1}. ${t.title || t.content || t.name || 'Task'}`)
+            .join('\n');
+          const suffix = tasks.length > 10 ? `\n...and ${tasks.length - 10} more` : '';
+          return { type: 'text', content: `📋 Tasks:\n${taskList}${suffix}` };
+        }
+
+        // Check for count-style responses
+        if (typeof parsed.count === 'number') {
+          return { type: 'text', content: `Found ${parsed.count} item(s).` };
+        }
+
+        // Check for success/error responses
+        if (parsed.success === true) {
+          return { type: 'text', content: '✅ Done!' };
+        }
+        if (parsed.success === false && parsed.error) {
+          return { type: 'text', content: `❌ Error: ${parsed.error}` };
+        }
+
         // Last resort: don't return raw JSON, ask for clarification
         console.warn('[AgentLoop] LLM returned unexpected JSON structure:', Object.keys(parsed));
+        return { type: 'text', content: "I processed your request but couldn't format the response. Please try again." };
       }
     }
   } catch {
