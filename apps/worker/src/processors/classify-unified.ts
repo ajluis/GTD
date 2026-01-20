@@ -2,7 +2,7 @@
  * Unified Classification Processor
  *
  * Uses the new fully agentic architecture:
- * - MCP tools for Todoist operations (source of truth)
+ * - Todoist as source of truth (via REST API)
  * - Rich context for intelligent inference
  * - Memory for long-term learning
  * - Inference engine for smart defaults
@@ -16,13 +16,11 @@ import { enqueueOutboundMessage } from '@gtd/queue';
 import type { Queue } from 'bullmq';
 import type { DbClient } from '@gtd/database';
 import { users, messages } from '@gtd/database';
-import { eq, desc } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
+import { TodoistClient } from '@gtd/todoist';
 
 // New unified architecture imports
 import { createUnifiedAgent, type UnifiedAgentConfig } from '@gtd/ai';
-
-// MCP imports (optional - for MCP-based Todoist operations)
-// import { connectTodoist } from '@gtd/mcp';
 
 /**
  * Unified Classification Processor
@@ -53,15 +51,21 @@ export function createUnifiedClassifyProcessor(
 
     const timezone = user.timezone ?? 'America/New_York';
 
-    // 2. Create unified agent
+    // 2. Create Todoist client if user has access token
+    const todoistClient = user.todoistAccessToken
+      ? new TodoistClient(user.todoistAccessToken)
+      : undefined;
+
+    if (!todoistClient) {
+      console.warn(`[UnifiedClassify] User ${userId} has no Todoist access token`);
+    }
+
+    // 3. Create unified agent
     const agentConfig: UnifiedAgentConfig = {
       db,
       userId,
       timezone,
-      // MCP client for Todoist (uncomment when ready to use MCP)
-      // todoistMCP: user.todoistAccessToken
-      //   ? await connectTodoist(user.todoistAccessToken)
-      //   : undefined,
+      todoistClient,
       enableInference: true,
       enableMemory: true,
       enableLearning: true,

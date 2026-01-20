@@ -12,7 +12,7 @@
  */
 
 import type { DbClient } from '@gtd/database';
-import type { Tool, ToolContext, AgentResult, ConversationContext } from './tools/types.js';
+import type { Tool, ToolContext, AgentResult, ConversationContext, TodoistClientLike } from './tools/types.js';
 import { runAgentLoop } from './agent/loop.js';
 import { buildAgentSystemPrompt } from './agent/prompts.js';
 import { allTools } from './tools/index.js';
@@ -34,6 +34,8 @@ export interface UnifiedAgentConfig {
   userId: string;
   /** User's timezone */
   timezone: string;
+  /** Todoist REST API client (for direct Todoist operations) */
+  todoistClient?: TodoistClientLike;
   /** Todoist MCP client (optional, for MCP-based operations) */
   todoistMCP?: MCPClientLike;
   /** Enable inference engine */
@@ -161,7 +163,7 @@ export class UnifiedAgent {
     const toolContext: ToolContext = {
       userId,
       db,
-      todoistClient: null, // We use MCP instead
+      todoistClient: this.config.todoistClient ?? null,
       timezone,
       conversationContext: loadedContext.conversationContext,
     };
