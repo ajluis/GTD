@@ -79,7 +79,7 @@ export function createUnifiedClassifyProcessor(
     try {
       const result = await agent.handleMessage(content);
 
-      response = result.response;
+      response = sanitizeResponse(result.response);
 
       // Log what happened
       console.log(`[UnifiedClassify] Success:`, {
@@ -137,6 +137,67 @@ export function createUnifiedClassifyProcessor(
 
     console.log(`[UnifiedClassify] Response queued for message ${messageId}`);
   };
+}
+
+/**
+ * Sanitize response to ensure we never send raw JSON to users
+ *
+ * This is a safety check to catch any malformed LLM responses
+ * that might contain raw JSON instead of human-readable text.
+ */
+function sanitizeResponse(response: string): string {
+  const trimmed = response.trim();
+
+  // Check if response looks like JSON
+  if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+
+      // If it's a tool_calls structure, something went wrong
+      if (parsed.tool_calls) {
+        console.warn('[UnifiedClassify] Response contained raw tool_calls JSON, returning fallback');
+        return "I processed your request but couldn't format a response. Please try again.";
+      }
+
+      // Try to extract a message from common response structures
+      const textFields = ['response', 'message', 'text', 'content', 'reply', 'data'];
+      for (const field of textFields) {
+        if (parsed[field] && typeof parsed[field] === 'string') {
+          return parsed[field];
+        }
+        // Handle nested data.message
+        if (parsed[field] && typeof parsed[field] === 'object' && parsed[field].message) {
+          return parsed[field].message;
+        }
+      }
+
+      // If it's a success response, try to extract useful info
+      if (parsed.success === true && parsed.data?.message) {
+        return parsed.data.message;
+      }
+
+      // Last resort for JSON that we can't parse meaningfully
+      console.warn('[UnifiedClassify] Response was unparseable JSON:', Object.keys(parsed));
+      return "Done! Your request has been processed.";
+    } catch {
+      // Not valid JSON, might just start with { by coincidence
+      // Fall through to return as-is
+    }
+  }
+
+  // Check for embedded JSON in the response (LLM sometimes wraps JSON in text)
+  const jsonMatch = trimmed.match(/\{[\s\S]*"tool_calls"[\s\S]*\}/);
+  if (jsonMatch) {
+    console.warn('[UnifiedClassify] Response contained embedded tool_calls JSON, cleaning');
+    // Remove the JSON part and return the rest
+    const cleaned = trimmed.replace(jsonMatch[0], '').trim();
+    if (cleaned.length > 10) {
+      return cleaned;
+    }
+    return "I processed your request but couldn't format a response. Please try again.";
+  }
+
+  return trimmed;
 }
 
 /**

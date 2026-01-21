@@ -1,17 +1,21 @@
 # GTD - Project Context
 
-> A GTD (Getting Things Done) assistant that works via SMS, using AI to classify messages and sync tasks to Todoist.
+> A GTD (Getting Things Done) assistant that works via SMS, using AI to manage tasks directly in Todoist (source of truth).
 
 **IMPORTANT:** Update this file before every `git push` to keep context current for future sessions.
 
 ## Overview
 
-GTD is an SMS-based task management system. Users text tasks to a phone number, and an AI (Gemini) classifies them into GTD categories, then syncs them to Todoist via the REST API.
+GTD is an SMS-based task management system. Users text tasks to a phone number, and a UnifiedAgent (powered by Gemini) classifies messages, executes actions using 23 specialized tools, and manages tasks directly in Todoist (the source of truth).
 
 **Core Flow:**
 ```
-User texts SMS → Sendblue webhook → Redis queue → Worker classifies with Gemini AI →
-Creates task in PostgreSQL → Syncs to Todoist → Sends confirmation SMS back
+User texts SMS → Sendblue webhook → Redis queue → UnifiedAgent:
+  1. Load context (preferences, learned patterns)
+  2. Retrieve relevant memories
+  3. Run agent loop with tools (max 5 iterations)
+  4. Tools query/update Todoist directly (source of truth)
+  5. Send confirmation SMS back
 ```
 
 ## Tech Stack
@@ -34,13 +38,16 @@ Creates task in PostgreSQL → Syncs to Todoist → Sends confirmation SMS back
 /Users/aluis/GTD/
 ├── apps/
 │   ├── api/              # Fastify API server (webhooks)
-│   ├── worker/           # BullMQ job processor (classification, sync)
+│   ├── worker/           # BullMQ job processor (runs UnifiedAgent)
 │   └── scheduler/        # Cron jobs (daily digest, reminders)
 ├── packages/
-│   ├── ai/               # Gemini AI classifier + LLM tools
+│   ├── ai/               # UnifiedAgent + tool system + Gemini client
+│   ├── mcp/              # MCP client for Todoist integration
+│   ├── context/          # User context management (preferences, patterns)
+│   ├── memory/           # Long-term memory & learning (corrections → patterns)
 │   ├── database/         # Drizzle schema + client
 │   ├── gtd/              # GTD formatters + command parsing
-│   ├── todoist/          # Todoist REST API client + task operations
+│   ├── todoist/          # Todoist REST API client (source of truth)
 │   ├── queue/            # BullMQ queue definitions
 │   ├── sendblue/         # Sendblue SMS client
 │   └── shared-types/     # TypeScript types shared across packages
@@ -51,26 +58,39 @@ Creates task in PostgreSQL → Syncs to Todoist → Sends confirmation SMS back
 
 ## Key Files
 
-### AI Classification
-> **Note:** These 4 files work together. When changing the classifier interface, update ALL of them:
-- `packages/ai/src/index.ts` - Package exports (must export new types)
-- `packages/ai/src/classifier.ts` - Main GTD classifier using Gemini
-  - `classify(message, people, time, history, mode)` - mode: 'classify' | 'extract'
-  - `cleanupTaskTitle()` - Defensive title cleanup
-- `packages/ai/src/prompts/classify-task.ts` - LLM prompt with intent detection + types
-  - Includes extraction mode instructions when `mode === 'extract'`
-- `packages/ai/src/fuzzy-match.ts` - Levenshtein distance for name matching
+### UnifiedAgent System
+> **Note:** The AI system uses a unified agent architecture with tool-based execution.
+- `packages/ai/src/unified-agent.ts` - Main agent orchestrator
+  - Loads context, retrieves memories, runs agent loop
+  - Handles tool execution and response generation
+- `packages/ai/src/agent/loop.ts` - Multi-turn agent loop
+  - Max 5 iterations with graceful fallbacks
+  - Robust response parsing (handles JSON arrays, objects, plain text)
+- `packages/ai/src/agent/prompts.ts` - System prompts for the agent
+- `packages/ai/src/agent/context.ts` - Agent context building
+- `packages/ai/src/tools/` - Specialized tools organized by function:
+  - `lookup/` - Query tools (getTasks, searchTasks, etc.)
+  - `actions/` - Modification tools (createTask, completeTask, etc.)
+  - `types.ts` - Tool type definitions
+  - `executor.ts` - Tool execution engine
+
+### Context & Memory
+- `packages/context/src/index.ts` - Context loader
+  - User preferences (label mappings, project defaults)
+  - Learned patterns (word associations from corrections)
+  - Session state (recent tasks, active people)
+- `packages/memory/src/index.ts` - Memory system
+  - Stores relevant past interactions
+  - Correction patterns become learning (user corrections → future defaults)
 
 ### Message Processing
-- `apps/worker/src/processors/classify.ts` - Main message processor (fetches conversation history)
-- `apps/worker/src/handlers/intents.ts` - Intent router (35+ intent types) + HandlerContext interface
-- `apps/worker/src/handlers/queries.ts` - Query handlers (today, actions, etc.) - uses Todoist queries
-- `apps/worker/src/handlers/settings.ts` - Settings handlers (timezone, digest)
-- `apps/worker/src/handlers/editing.ts` - Task editing (reschedule, rename, etc.) - uses Todoist API
-- `apps/worker/src/handlers/people.ts` - People management (add, remove, alias)
-- `apps/worker/src/handlers/completion.ts` - Task completion handlers - uses Todoist completeTask
+- `apps/worker/src/processors/classify.ts` - Main message processor
+  - Fetches conversation history
+  - Invokes UnifiedAgent with context
+  - Handles response and sends SMS
 
-### Todoist Integration
+### Todoist Integration (Source of Truth)
+> **Important:** Todoist is the single source of truth for all task data. No local task sync - tools query Todoist directly.
 - `packages/todoist/src/client.ts` - REST API client with get/post/update/delete methods
 - `packages/todoist/src/services/tasks.ts` - Task CRUD + queries (createTask, completeTask, updateTask, deleteTask)
 - `packages/todoist/src/services/projects.ts` - Project queries (getProjects, findProject)
@@ -84,6 +104,7 @@ Creates task in PostgreSQL → Syncs to Todoist → Sends confirmation SMS back
   - `queryPersonAgenda(personLabel)` - Person's agenda items
   - `queryDueThisWeek()` - Tasks due within 7 days
   - `searchTasks(searchText)` - Full-text search
+- `packages/mcp/` - MCP client for structured Todoist tool interactions
 
 ### Database Schema
 - `packages/database/src/schema/users.ts` - User accounts + Todoist credentials
@@ -280,45 +301,39 @@ Both Dockerfiles need the scheduler's package.json in the deps stage for the mon
 
 ### Recently Implemented
 - [x] Todoist migration (replaced Notion)
-- [x] LLM-driven intent system (35+ intents)
+- [x] **UnifiedAgent architecture** - Tool-based agent with 23 specialized tools
+- [x] **Todoist as source of truth** - No local task sync, direct API queries
+- [x] **Context system** (@gtd/context) - User preferences, learned patterns
+- [x] **Memory system** (@gtd/memory) - Correction learning, relevant retrieval
+- [x] **MCP package** (@gtd/mcp) - Structured Todoist tool interactions
+- [x] **Robust response parsing** - Handles JSON arrays, objects, plain text from Gemini
 - [x] Fuzzy name matching with Levenshtein distance
 - [x] Task editing commands (reschedule, rename, delete, etc.)
 - [x] Follow-up questions for vague tasks
 - [x] Scheduler app for daily digest/reminders
 - [x] Conversation history for AI context (resolves "that", "it", "the first one")
-- [x] Extraction mode for re-classification after clarification
 - [x] Defensive title cleanup (removes "Let's", "I need to", etc.)
 - [x] Auto-create people when user provides info about unknown person
 - [x] Professional WAITING task titles (e.g., "Person to deliver X")
 - [x] Context guidance in prompt (calls for quick phone tasks, computer for dense work)
-- [x] Required context/priority with smart defaults (no null values)
 - [x] Weekly review feature (scheduled SMS + interactive REVIEW command)
-- [x] Batch operations with confirmation flow
 
-### Classifier Modes
-The classifier has two modes (passed as 5th parameter):
-- `'classify'` (default) - Normal classification, may return `needs_clarification`
-- `'extract'` - Used after user clarification, ALWAYS returns task type, extracts all fields
-
-This prevents re-classification from returning `needs_clarification` with undefined fields.
-
-### Title Cleanup
-The `cleanupTaskTitle()` function in `classifier.ts` defensively strips casual prefixes:
-- "Let's ask Sam..." → "Ask Sam..."
-- "I need to call dentist" → "Call dentist"
-- "Can you add..." → removes prefix
-
-Applied in `normalizeTaskResult()` even if LLM ignores prompt instructions.
+### Agent Architecture Details
+The UnifiedAgent replaces the old intent-based handler system:
+- **Agent Loop**: Up to 5 iterations with tool calls
+- **Response Parsing**: Handles multiple JSON formats from Gemini (arrays, objects, wrapped objects)
+- **Tool System**: 23 tools across categories (lookup, action, people, settings)
+- **Graceful Fallbacks**: Falls back to text response if parsing fails
 
 ### Known Issues
 1. Legacy Notion columns still in database (kept for data preservation)
+2. MCP client initialization can be slow on cold starts
 
 ### TODOs
 - [ ] Implement Todoist OAuth flow for multi-user support
-- [ ] Add two-way sync (Todoist changes → local DB)
 - [ ] Project health tracking
-- [ ] Implement `change_task_type` (needs last task tracking)
-- [ ] Add conversation state for post-meeting flow
+- [ ] Improve cold start performance for MCP client
+- [ ] Add more learning signals to memory system
 
 ## Testing Locally
 
@@ -376,4 +391,4 @@ railway logs
 
 ---
 
-*Last updated: January 20, 2026 (Todoist migration - replaced Notion with Todoist REST API)*
+*Last updated: January 20, 2026 (UnifiedAgent architecture, Todoist as source of truth, added mcp/context/memory packages)*

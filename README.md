@@ -1,15 +1,16 @@
 # GTD - SMS-Based GTD Task Management
 
-GTD is an SMS-based GTD (Getting Things Done) assistant that syncs with Todoist. Text your tasks, thoughts, and discussion topics — GTD uses AI to classify them and organizes everything in Todoist automatically.
+GTD is an SMS-based GTD (Getting Things Done) assistant powered by a UnifiedAgent that manages tasks directly in Todoist (the source of truth). Text your tasks, thoughts, and discussion topics — the AI agent classifies them and organizes everything in Todoist automatically using 23 specialized tools.
 
 ## Features
 
 - 📱 **SMS Interface** - Capture tasks naturally via text message
-- 🤖 **AI Classification** - Gemini AI categorizes tasks into GTD types
-- ✅ **Todoist Sync** - Tasks automatically appear in your Todoist workspace
+- 🤖 **UnifiedAgent** - Gemini-powered agent with 23 specialized tools
+- ✅ **Todoist Native** - Todoist is the source of truth (no local sync)
 - 👥 **Agenda Management** - Track discussion topics for each person you meet with
 - ⏳ **Waiting Items** - Track what you're waiting for from others
 - 💭 **Someday/Maybe** - Capture future ideas without cluttering your actions
+- 🧠 **Learning Memory** - Corrections become future defaults
 
 ## Tech Stack
 
@@ -28,14 +29,17 @@ GTD is an SMS-based GTD (Getting Things Done) assistant that syncs with Todoist.
 gtd/
 ├── apps/
 │   ├── api/          # Fastify webhook server
-│   ├── worker/       # BullMQ message processor
+│   ├── worker/       # BullMQ message processor (runs UnifiedAgent)
 │   └── scheduler/    # Cron jobs (daily digest, reminders)
 ├── packages/
+│   ├── ai/           # UnifiedAgent + tool system + Gemini client
+│   ├── mcp/          # MCP client for Todoist integration
+│   ├── context/      # User context (preferences, patterns)
+│   ├── memory/       # Long-term memory & learning
 │   ├── database/     # Drizzle ORM schemas
 │   ├── queue/        # BullMQ configuration
 │   ├── sendblue/     # Sendblue API client
-│   ├── todoist/      # Todoist API integration
-│   ├── ai/           # Gemini classification + LLM tools
+│   ├── todoist/      # Todoist REST API (source of truth)
 │   ├── gtd/          # GTD domain logic
 │   └── shared-types/ # TypeScript types
 └── docker-compose.yml
@@ -126,11 +130,13 @@ GOOGLE_AI_API_KEY=
 ```
 SMS arrives → Sendblue Webhook → API Server → BullMQ Queue
                                                     ↓
-                                            Worker processes:
-                                            1. Classify with Gemini AI
-                                            2. Create local task
-                                            3. Sync to Todoist
-                                            4. Send confirmation SMS
+                                            Worker runs UnifiedAgent:
+                                            1. Load context (preferences, patterns)
+                                            2. Retrieve relevant memories
+                                            3. Run agent loop with tools
+                                            4. Tools query/update Todoist directly
+                                               (Todoist = source of truth)
+                                            5. Send confirmation SMS
 ```
 
 ## License

@@ -25,6 +25,14 @@ import {
   batchDeleteTasks,
 } from './actions/batch.js';
 import { createPerson, updatePerson, removePerson } from './actions/people.js';
+import {
+  setTimezone,
+  setDigestTime,
+  setMeetingReminderHours,
+  setWeeklyReviewSchedule,
+  pauseAccount,
+  resumeAccount,
+} from './actions/settings.js';
 
 // Re-export types
 export * from './types.js';
@@ -57,6 +65,14 @@ export const allTools: Tool[] = [
   createPerson,
   updatePerson,
   removePerson,
+
+  // Settings tools
+  setTimezone,
+  setDigestTime,
+  setMeetingReminderHours,
+  setWeeklyReviewSchedule,
+  pauseAccount,
+  resumeAccount,
 ];
 
 /**
@@ -122,6 +138,17 @@ export const toolSets = {
     getProductivityStats,
   ],
 
+  /** Tools for settings operations */
+  settings: [
+    getUserSettings,
+    setTimezone,
+    setDigestTime,
+    setMeetingReminderHours,
+    setWeeklyReviewSchedule,
+    pauseAccount,
+    resumeAccount,
+  ],
+
   /** Full toolset for general agent */
   full: allTools,
 };
@@ -169,4 +196,10 @@ export {
   createPerson,
   updatePerson,
   removePerson,
+  setTimezone,
+  setDigestTime,
+  setMeetingReminderHours,
+  setWeeklyReviewSchedule,
+  pauseAccount,
+  resumeAccount,
 };
