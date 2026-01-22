@@ -352,6 +352,12 @@ const VALID_INTENTS: IntentType[] = [
   'show_stats',
   'show_help',
   'show_weekly_review',
+  // Context & Conversational
+  'provide_context',
+  'thinking_aloud',
+  'casual_thanks',
+  'casual_acknowledgment',
+  'casual_nevermind',
 ];
 
 /**

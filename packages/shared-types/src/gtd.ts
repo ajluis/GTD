@@ -204,7 +204,13 @@ export type IntentType =
   | 'show_weekly_review'
   // Weekly review settings
   | 'set_review_day'
-  | 'set_review_time';
+  | 'set_review_time'
+  // Context & Conversational (no task capture needed)
+  | 'provide_context'
+  | 'thinking_aloud'
+  | 'casual_thanks'
+  | 'casual_acknowledgment'
+  | 'casual_nevermind';
 
 /**
  * Entities extracted from user message for intent handling

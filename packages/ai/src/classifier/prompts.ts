@@ -36,11 +36,19 @@ CLASSIFICATION TYPES
    - "daily digest" / "daily review" / "morning summary" → set_digest_time
    - "weekly review" → set_review_time or set_review_day
 
-4. "needs_clarification" - Too vague to process
+4. "context" - User is providing background info, NOT a task
+   - Signals: "fyi", "btw", "just so you know", "heads up", "for context"
+   - Relationship info: "Rob is Sarah's manager", "Mike reports to Lisa"
+   - Status updates: "meeting moved to 3pm", "client is traveling"
+   - Thinking aloud: "maybe we should...", "I've been thinking..."
+   - Casual responses: "thanks", "cool", "ok", "sounds good", "never mind"
+   - NO task capture needed - just acknowledge briefly
+
+5. "needs_clarification" - Too vague to process
    - No deadline when one seems needed
    - Ambiguous task description
 
-5. "unknown" - Can't understand at all
+6. "unknown" - Can't understand at all
 
 ═══════════════════════════════════════════════════════════════
 needsDataLookup DECISION
@@ -197,6 +205,16 @@ For INTENT:
   ]
 }
 
+For CONTEXT (background info, not a task):
+{
+  "type": "context",
+  "needsDataLookup": false,
+  "confidence": 0.9,
+  "contextType": "fyi|relationship|status|thinking|casual",
+  "content": "The background info provided",
+  "suggestedResponse": "Got it 👍" | "Noted" | "Thanks for the heads up" | null
+}
+
 For NEEDS_CLARIFICATION:
 {
   "type": "needs_clarification",
@@ -311,4 +329,11 @@ export const INTENT_TYPES = [
   // Corrections
   'undo_last',
   'correct_person',
+
+  // Context & Conversational (no task capture)
+  'provide_context',
+  'thinking_aloud',
+  'casual_thanks',
+  'casual_acknowledgment',
+  'casual_nevermind',
 ] as const;

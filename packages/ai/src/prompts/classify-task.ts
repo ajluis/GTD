@@ -202,6 +202,29 @@ INTENT DETECTION (check FIRST)
    │ "review at 6pm" (time only, no day) → set_review_time
    └─────────────────────────────────────────────────────────────
 
+9. CONTEXT & CONVERSATIONAL (NO task capture needed)
+   ┌─────────────────────────────────────────────────────────────
+   │ BACKGROUND INFO (store for context, brief acknowledgment):
+   │ "fyi [info]", "btw [info]", "just so you know [info]" → provide_context
+   │ "heads up: [info]", "for context: [info]" → provide_context
+   │ "[person] is [person]'s manager/report/etc" → provide_context
+   │ "meeting moved to [time]", "[event] rescheduled" → provide_context
+   │
+   │ THINKING ALOUD (acknowledge, offer to capture):
+   │ "maybe we should...", "I've been thinking..." → thinking_aloud
+   │ "not sure if...", "wondering if..." → thinking_aloud
+   │ Response: "Interesting thought. Want me to capture that?"
+   │
+   │ CASUAL RESPONSES (minimal or no response needed):
+   │ "thanks", "thx", "thank you" → casual_thanks
+   │ "cool", "ok", "sounds good", "great" → casual_acknowledgment
+   │ "never mind", "nvm", "forget it" → casual_nevermind
+   │ Response: "You got it!" / "👍" / "No problem"
+   │
+   │ IMPORTANT: These are NOT tasks. Do NOT create tasks from them.
+   │ Just acknowledge briefly and store context for future reference.
+   └─────────────────────────────────────────────────────────────
+
 ═══════════════════════════════════════════════════════════════
 TASK CAPTURE (if not an intent)
 ═══════════════════════════════════════════════════════════════
