@@ -493,7 +493,17 @@ function parseResponse(
     if (trimmed.includes('"tool"') || trimmed.includes('"tool_calls"') || trimmed.includes('"parameters"')) {
       console.warn('[AgentLoop] LLM returned malformed JSON that looks like tool calls');
 
-      // If we already have tool results, synthesize a response from them instead of failing
+      // Try to repair truncated JSON and extract tool call
+      const repaired = tryRepairToolCallJson(trimmed);
+      if (repaired) {
+        console.log('[AgentLoop] Successfully repaired truncated tool call');
+        return {
+          type: 'tool_calls',
+          calls: [repaired],
+        };
+      }
+
+      // If repair failed but we have existing tool results, synthesize from them
       if (hasToolResults && existingToolCalls.length > 0) {
         console.log('[AgentLoop] Synthesizing response from existing tool results');
         const lastCall = existingToolCalls[existingToolCalls.length - 1]!;
@@ -501,12 +511,12 @@ function parseResponse(
           const data = lastCall.result.data as any;
           if (data.tasks && Array.isArray(data.tasks)) {
             if (data.tasks.length === 0) {
-              return { type: 'text', content: "📋 No tasks found for tomorrow." };
+              return { type: 'text', content: "📋 No tasks found." };
             }
             const taskList = data.tasks.slice(0, 5).map((t: any, i: number) =>
               `${i + 1}. ${t.title}${t.dueString ? ` (${t.dueString})` : ''}`
             ).join('\n');
-            return { type: 'text', content: `📋 Tomorrow's agenda:\n${taskList}` };
+            return { type: 'text', content: `📋 Tasks:\n${taskList}` };
           }
           if (data.people && Array.isArray(data.people)) {
             if (data.people.length === 0) {
@@ -532,6 +542,62 @@ function parseResponse(
 
   // Return as plain text response
   return { type: 'text', content: trimmed };
+}
+
+/**
+ * Attempt to repair truncated JSON tool call
+ * Extracts tool name and parameters using regex when JSON.parse fails
+ */
+function tryRepairToolCallJson(json: string): ParsedToolCall | null {
+  try {
+    // Extract tool name
+    const toolNameMatch = json.match(/"(?:tool|name)"\s*:\s*"([^"]+)"/);
+    if (!toolNameMatch) return null;
+
+    const toolName = toolNameMatch[1];
+    const parameters: Record<string, unknown> = {};
+
+    // Extract common parameters using regex
+    // Title (for task creation) - handle truncated strings
+    const titleMatch = json.match(/"title"\s*:\s*"([^"]*)/);
+    if (titleMatch) {
+      parameters['title'] = titleMatch[1];
+    }
+
+    // PersonName
+    const personMatch = json.match(/"personName"\s*:\s*"([^"]+)"/);
+    if (personMatch) {
+      parameters['personName'] = personMatch[1];
+    }
+
+    // Due date
+    const dueMatch = json.match(/"dueDate"\s*:\s*"([^"]+)"/);
+    if (dueMatch) {
+      parameters['dueDate'] = dueMatch[1];
+    }
+
+    // Context
+    const contextMatch = json.match(/"context"\s*:\s*"([^"]+)"/);
+    if (contextMatch) {
+      parameters['context'] = contextMatch[1];
+    }
+
+    // Type
+    const typeMatch = json.match(/"type"\s*:\s*"([^"]+)"/);
+    if (typeMatch) {
+      parameters['type'] = typeMatch[1];
+    }
+
+    // Validate we have minimum required data
+    if (toolName && Object.keys(parameters).length > 0) {
+      console.log('[AgentLoop] Repaired truncated tool call:', { toolName, parameters });
+      return { name: toolName, parameters };
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 /**
