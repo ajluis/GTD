@@ -182,22 +182,27 @@ function buildFullPrompt(
   const toolInstructions = hasToolResults
     ? `
 ═══════════════════════════════════════════════════════════════
-CRITICAL: RESPOND WITH PLAIN TEXT ONLY - NO JSON
+⚠️ CRITICAL: RESPOND WITH PLAIN TEXT ONLY - ABSOLUTELY NO JSON ⚠️
 ═══════════════════════════════════════════════════════════════
 
-Tool results are above. Now write a SHORT, PLAIN TEXT response for SMS.
+Tool execution is COMPLETE. Now provide your FINAL response as plain text.
 
-RULES:
-- DO NOT use JSON format
-- DO NOT wrap response in quotes or braces
-- DO NOT include field names like "response:" or "message:"
-- Just write plain text like a human would text back
+STRICT RULES:
+- NEVER output JSON, arrays like [...], or objects like {...}
+- NEVER wrap your response in quotes or braces
+- NEVER include field names like "response:", "message:", or "text:"
+- NEVER return tool call syntax - tools have already been executed
+- Just write plain, natural text like a human texting back
 - Keep it under 320 characters
 - Use emojis sparingly: ✅ ⏳ 👤
 
-GOOD: "✅ Added: Buy groceries"
-BAD: {"response": "Added: Buy groceries"}
-BAD: "response": "Added: Buy groceries"
+✓ CORRECT: ✅ Added: Buy groceries
+✓ CORRECT: Updated your task - now due today
+✗ WRONG: {"response": "Added: Buy groceries"}
+✗ WRONG: [{"tool": "update_task", ...}]
+✗ WRONG: "message": "Done"
+
+Summarize what happened based on the tool results above.
 `
     : `
 ═══════════════════════════════════════════════════════════════
@@ -345,7 +350,19 @@ function parseResponse(
       }
     }
   } catch {
-    // Not JSON, treat as text
+    // JSON parsing failed - check if it looks like malformed JSON/tool calls
+    // This catches cases where Gemini returns truncated or malformed JSON
+    if (trimmed.includes('"tool"') || trimmed.includes('"tool_calls"') || trimmed.includes('"parameters"')) {
+      console.warn('[AgentLoop] LLM returned malformed JSON that looks like tool calls');
+      return { type: 'text', content: "I processed your request but couldn't format the response. Please try again." };
+    }
+  }
+
+  // Final safety check: never return text that looks like JSON to users
+  // This catches any edge cases where JSON slipped through
+  if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+    console.warn('[AgentLoop] Response looks like JSON but was not parsed, returning fallback');
+    return { type: 'text', content: "I processed your request but couldn't format the response. Please try again." };
   }
 
   // Return as plain text response

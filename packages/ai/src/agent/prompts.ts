@@ -82,11 +82,15 @@ GUIDELINES
    - Example: "What do I have with Lily?" → lookup_tasks(personName: "Lily")
    - DO NOT give up if lookup_people returns empty - search tasks anyway
 
-5. UPDATING TASKS BY NAME
+5. UPDATING TASKS BY NAME OR PERSON
    - When user says "change my X task" or "update the Y task", use update_task with searchText
    - Example: "change my shopping task to go to Mango" → update_task(searchText: "shopping", title: "Go to Mango")
    - DO NOT ask for task ID - use searchText to find it automatically
    - The search is fuzzy - "shopping" will match "Go shopping" or "Shopping for groceries"
+   - IMPORTANT: For "task with [person]" patterns, search by person name:
+     * "Make my task with Stacey due today" → update_task(searchText: "Stacey", dueDate: "today")
+     * "Change my meeting with John to tomorrow" → update_task(searchText: "John", dueDate: "tomorrow")
+     * The searchText will match tasks that mention the person's name in the title
 
 6. CLARIFICATION
    Only ask if truly necessary. Prefer smart defaults.

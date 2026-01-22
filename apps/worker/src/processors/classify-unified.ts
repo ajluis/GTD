@@ -153,7 +153,20 @@ function sanitizeResponse(response: string): string {
     try {
       const parsed = JSON.parse(trimmed);
 
-      // If it's a tool_calls structure, something went wrong
+      // Handle array format tool calls: [{"tool": "...", "parameters": {...}}]
+      // This is what Gemini sometimes returns instead of proper text
+      if (Array.isArray(parsed)) {
+        // Check if it looks like tool calls
+        if (parsed.length > 0 && (parsed[0].tool || parsed[0].name || parsed[0].tool_calls)) {
+          console.warn('[UnifiedClassify] Response contained raw array tool_calls JSON, returning fallback');
+          return "I processed your request but couldn't format a response. Please try again.";
+        }
+        // It's some other array - shouldn't be sent to user
+        console.warn('[UnifiedClassify] Response was an array, returning fallback');
+        return "Done! Your request has been processed.";
+      }
+
+      // If it's a tool_calls structure (object format), something went wrong
       if (parsed.tool_calls) {
         console.warn('[UnifiedClassify] Response contained raw tool_calls JSON, returning fallback');
         return "I processed your request but couldn't format a response. Please try again.";
@@ -180,17 +193,26 @@ function sanitizeResponse(response: string): string {
       console.warn('[UnifiedClassify] Response was unparseable JSON:', Object.keys(parsed));
       return "Done! Your request has been processed.";
     } catch {
-      // Not valid JSON, might just start with { by coincidence
-      // Fall through to return as-is
+      // Malformed JSON - definitely shouldn't be sent to user
+      // Check if it looks like it was trying to be tool calls
+      if (trimmed.includes('"tool"') || trimmed.includes('"tool_calls"') || trimmed.includes('"parameters"')) {
+        console.warn('[UnifiedClassify] Response contained malformed tool JSON, returning fallback');
+        return "I processed your request but couldn't format a response. Please try again.";
+      }
+      // Might just start with { or [ by coincidence, fall through
     }
   }
 
   // Check for embedded JSON in the response (LLM sometimes wraps JSON in text)
-  const jsonMatch = trimmed.match(/\{[\s\S]*"tool_calls"[\s\S]*\}/);
-  if (jsonMatch) {
-    console.warn('[UnifiedClassify] Response contained embedded tool_calls JSON, cleaning');
+  // Check for both object format {"tool_calls": ...} and array format [{"tool": ...}]
+  const objectJsonMatch = trimmed.match(/\{[\s\S]*"tool_calls"[\s\S]*\}/);
+  const arrayJsonMatch = trimmed.match(/\[\s*\{[\s\S]*"tool"[\s\S]*\}\s*\]/);
+
+  if (objectJsonMatch || arrayJsonMatch) {
+    const jsonMatch = objectJsonMatch || arrayJsonMatch;
+    console.warn('[UnifiedClassify] Response contained embedded tool JSON, cleaning');
     // Remove the JSON part and return the rest
-    const cleaned = trimmed.replace(jsonMatch[0], '').trim();
+    const cleaned = trimmed.replace(jsonMatch![0], '').trim();
     if (cleaned.length > 10) {
       return cleaned;
     }
