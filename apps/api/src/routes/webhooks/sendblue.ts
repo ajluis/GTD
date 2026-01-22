@@ -4,10 +4,20 @@ import {
   validateWebhookSignature,
   extractValidationHeaders,
   WebhookValidationError,
+  createSendblueClient,
+  fireTypingIndicator,
 } from '@gtd/sendblue';
 import { enqueueInboundMessage } from '@gtd/queue';
 import type { Queue } from 'bullmq';
 import type { MessageJobData } from '@gtd/queue';
+
+// Create Sendblue client for typing indicators (graceful degradation if not configured)
+let sendblueClient: ReturnType<typeof createSendblueClient> | null = null;
+try {
+  sendblueClient = createSendblueClient();
+} catch {
+  // Client not configured - typing indicators will be skipped
+}
 
 /**
  * Sendblue webhook configuration
@@ -136,7 +146,16 @@ export function createSendblueWebhook(config: SendblueWebhookConfig): FastifyPlu
           return reply.status(200).send({ received: true, skipped: true });
         }
 
-        // 4. Enqueue for async processing
+        // 4. Send typing indicator (fire-and-forget)
+        if (sendblueClient) {
+          fireTypingIndicator(sendblueClient, payload.from_number);
+          fastify.log.debug(
+            { toNumber: payload.from_number },
+            'Typing indicator sent'
+          );
+        }
+
+        // 5. Enqueue for async processing
         try {
           const jobId = await enqueueInboundMessage(config.messageQueue, {
             messageHandle: payload.message_handle,
@@ -154,7 +173,7 @@ export function createSendblueWebhook(config: SendblueWebhookConfig): FastifyPlu
             'Message enqueued for processing'
           );
 
-          // 5. Return immediately (< 3 seconds)
+          // 6. Return immediately (< 3 seconds)
           return reply.status(200).send({
             received: true,
             queued: true,

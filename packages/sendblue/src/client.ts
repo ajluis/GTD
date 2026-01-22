@@ -80,6 +80,21 @@ export class SendblueClient {
   }
 
   /**
+   * Send a typing indicator ("..." bubble)
+   *
+   * Shows the recipient that a message is being composed.
+   * The indicator typically expires after ~60 seconds if no message is sent.
+   *
+   * @param toNumber - Recipient phone number (E.164 format)
+   */
+  async sendTypingIndicator(toNumber: string): Promise<void> {
+    await this.request<{ status: string }>('/send-typing-indicator', {
+      method: 'POST',
+      body: JSON.stringify({ number: toNumber }),
+    });
+  }
+
+  /**
    * Send a message with media attachment
    */
   async sendMediaMessage(
@@ -154,5 +169,20 @@ export function createSendblueClient(): SendblueClient {
     apiKey,
     apiSecret,
     phoneNumber,
+  });
+}
+
+/**
+ * Fire-and-forget typing indicator
+ *
+ * Sends a typing indicator without awaiting or throwing errors.
+ * Failures are logged but never propagate to the caller.
+ *
+ * @param client - SendblueClient instance
+ * @param toNumber - Recipient phone number (E.164 format)
+ */
+export function fireTypingIndicator(client: SendblueClient, toNumber: string): void {
+  client.sendTypingIndicator(toNumber).catch((error) => {
+    console.warn(`[Sendblue] Failed to send typing indicator to ${toNumber}:`, error.message);
   });
 }

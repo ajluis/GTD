@@ -2,6 +2,7 @@ export {
   SendblueClient,
   SendblueError,
   createSendblueClient,
+  fireTypingIndicator,
   type SendblueClientConfig,
 } from './client.js';
 
