@@ -107,8 +107,22 @@ export async function createTaskWithRouting(
   let content = data.title;
 
   // Format waiting tasks as "PersonName — Task"
+  // But avoid duplication if title already starts with the person's name
   if (data.type === 'waiting' && data.personName) {
-    content = `${data.personName} — ${data.title}`;
+    const titleLower = data.title.toLowerCase();
+    const personLower = data.personName.toLowerCase();
+
+    // Check if title already starts with the person's name
+    // This handles cases like "Stan response to message" where AI kept the name
+    if (!titleLower.startsWith(personLower)) {
+      content = `${data.personName} — ${data.title}`;
+    }
+    // If it already starts with the name, use as-is (or add the "—" separator)
+    else if (!data.title.includes('—')) {
+      // Title starts with name but no separator, add it: "Stan response" → "Stan — response"
+      const afterName = data.title.substring(data.personName.length).trim();
+      content = `${data.personName} — ${afterName}`;
+    }
   }
 
   // 4. Build description
