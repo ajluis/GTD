@@ -131,18 +131,50 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentResu
         const lastCall = toolCalls.length > 0 ? toolCalls[toolCalls.length - 1] : undefined;
         if (lastCall && lastCall.result.success && lastCall.result.data) {
           const data = lastCall.result.data as any;
+          const toolName = lastCall.tool;
+
+          // Handle create_task response
+          if (toolName === 'create_task' && data.title) {
+            return { success: true, response: `✅ Added: ${data.title}`, toolCalls, updatedContext };
+          }
+
+          // Handle update_task response
+          if (toolName === 'update_task' && data.title) {
+            return { success: true, response: `✅ Updated: ${data.title}`, toolCalls, updatedContext };
+          }
+
+          // Handle complete_task response
+          if (toolName === 'complete_task') {
+            return { success: true, response: `✅ Marked complete!`, toolCalls, updatedContext };
+          }
+
+          // Handle delete_task response
+          if (toolName === 'delete_task') {
+            return { success: true, response: `🗑️ Task deleted.`, toolCalls, updatedContext };
+          }
+
+          // Handle lookup_tasks response (array of tasks)
           if (data.tasks && Array.isArray(data.tasks)) {
             if (data.tasks.length === 0) {
-              return { success: true, response: "📋 No tasks found for tomorrow.", toolCalls, updatedContext };
+              return { success: true, response: "📋 No tasks found.", toolCalls, updatedContext };
             }
             const taskList = data.tasks.slice(0, 5).map((t: any, i: number) =>
               `${i + 1}. ${t.title}${t.dueString ? ` (${t.dueString})` : ''}`
             ).join('\n');
-            return { success: true, response: `📋 Tomorrow's agenda:\n${taskList}`, toolCalls, updatedContext };
+            return { success: true, response: `📋 Tasks:\n${taskList}`, toolCalls, updatedContext };
+          }
+
+          // Handle lookup_people response
+          if (data.people && Array.isArray(data.people)) {
+            if (data.people.length === 0) {
+              return { success: true, response: "👤 No people found.", toolCalls, updatedContext };
+            }
+            const names = data.people.slice(0, 5).map((p: any) => p.name).join(', ');
+            return { success: true, response: `👤 Found: ${names}`, toolCalls, updatedContext };
           }
         }
         // Fallback if we can't synthesize
-        return { success: true, response: "I found what you asked for. Please try asking again for details.", toolCalls, updatedContext };
+        return { success: true, response: "✅ Done!", toolCalls, updatedContext };
       }
 
       // Execute tool calls
