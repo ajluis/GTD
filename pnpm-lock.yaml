@@ -164,6 +164,9 @@ importers:
       '@gtd/shared-types':
         specifier: workspace:*
         version: link:../shared-types
+      '@gtd/todoist':
+        specifier: workspace:*
+        version: link:../todoist
       drizzle-orm:
         specifier: ^0.38.3
         version: 0.38.4(postgres@3.4.8)

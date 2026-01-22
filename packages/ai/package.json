@@ -22,6 +22,7 @@
     "@gtd/shared-types": "workspace:*",
     "@gtd/context": "workspace:*",
     "@gtd/memory": "workspace:*",
+    "@gtd/todoist": "workspace:*",
     "@google/generative-ai": "^0.21.0",
     "drizzle-orm": "^0.38.3"
   },

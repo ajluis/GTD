@@ -1,11 +1,18 @@
 /**
  * Task Action Tools
  * Create, update, complete, and delete tasks
+ *
+ * Tasks are stored locally AND synced to Todoist (if connected).
+ * Todoist is the source of truth for task display.
  */
 
-import type { Tool, ToolContext, ToolResult, StoredTaskData } from '../types.js';
+import type { Tool, ToolContext, ToolResult, StoredTaskData, TodoistClientLike } from '../types.js';
 import { tasks, users, people } from '@gtd/database';
 import { eq, and, ilike } from 'drizzle-orm';
+import type { TodoistClient } from '@gtd/todoist';
+import { discoverTodoistStructure, type TodoistStructure } from '@gtd/todoist';
+import { createTaskWithRouting, updateTask as updateTodoistTask, completeTask as completeTodoistTask, deleteTask as deleteTodoistTask } from '@gtd/todoist';
+import type { TaskType, TaskContext as GTDContext, TaskPriority } from '@gtd/shared-types';
 
 /**
  * Generate search variations for fuzzy matching
@@ -148,7 +155,33 @@ export const createTask: Tool = {
         }
       }
 
-      // Create the task
+      // Sync to Todoist first (if connected)
+      let todoistTaskId: string | null = null;
+      if (context.todoistClient) {
+        try {
+          console.log('[create_task] Syncing to Todoist...');
+          const structure = await discoverTodoistStructure(context.todoistClient as TodoistClient);
+          todoistTaskId = await createTaskWithRouting(
+            context.todoistClient as TodoistClient,
+            structure,
+            {
+              title,
+              type: type as TaskType,
+              context: taskContext as GTDContext | undefined,
+              priority: priority as TaskPriority | undefined,
+              dueDate: dueDate || undefined,
+              personName: resolvedPersonName || undefined,
+              notes: notes || undefined,
+            }
+          );
+          console.log('[create_task] Created in Todoist:', todoistTaskId);
+        } catch (todoistError) {
+          console.error('[create_task] Todoist sync failed:', todoistError);
+          // Continue with local creation even if Todoist fails
+        }
+      }
+
+      // Create the task locally
       const [task] = await context.db
         .insert(tasks)
         .values({
@@ -162,6 +195,7 @@ export const createTask: Tool = {
           dueDate: dueDate || null,
           personId: resolvedPersonId,
           notes: notes || null,
+          todoistTaskId: todoistTaskId,
         })
         .returning();
 
@@ -179,6 +213,7 @@ export const createTask: Tool = {
         success: true,
         data: {
           taskId: task!.id,
+          todoistTaskId,
           title: task!.title,
           type: task!.type,
           context: task!.context,
@@ -190,6 +225,7 @@ export const createTask: Tool = {
         undoAction: {
           type: 'delete_created_task',
           taskId: task!.id,
+          todoistTaskId: todoistTaskId || undefined,
         },
         trackEntities: {
           lastCreatedTaskId: task!.id,
@@ -350,17 +386,49 @@ export const updateTask: Tool = {
         updateData['notes'] = updates['notes'];
       }
 
-      // Update the task
+      // Update the task locally
       const [updated] = await context.db
         .update(tasks)
         .set(updateData)
         .where(eq(tasks.id, resolvedTaskId))
         .returning();
 
+      // Sync to Todoist if connected and task has a Todoist ID
+      if (context.todoistClient && currentTask.todoistTaskId) {
+        try {
+          console.log('[update_task] Syncing to Todoist:', currentTask.todoistTaskId);
+          const todoistUpdates: { content?: string; due_date?: string; priority?: 1 | 2 | 3 | 4 } = {};
+
+          if (updates['title']) {
+            todoistUpdates['content'] = updates['title'];
+          }
+          if (updates['dueDate']) {
+            todoistUpdates['due_date'] = updates['dueDate'];
+          }
+          if (updates['priority']) {
+            const priorityMap: Record<string, 1 | 2 | 3 | 4> = { today: 4, this_week: 3, soon: 2 };
+            todoistUpdates['priority'] = priorityMap[updates['priority']] || 1;
+          }
+
+          if (Object.keys(todoistUpdates).length > 0) {
+            await updateTodoistTask(
+              context.todoistClient as TodoistClient,
+              currentTask.todoistTaskId,
+              todoistUpdates
+            );
+            console.log('[update_task] Synced to Todoist');
+          }
+        } catch (todoistError) {
+          console.error('[update_task] Todoist sync failed:', todoistError);
+          // Continue even if Todoist sync fails
+        }
+      }
+
       return {
         success: true,
         data: {
           taskId: updated!.id,
+          todoistTaskId: currentTask.todoistTaskId,
           title: updated!.title,
           type: updated!.type,
           context: updated!.context,
@@ -419,7 +487,19 @@ export const completeTask: Tool = {
       // Determine new status
       const newStatus = task.type === 'agenda' ? 'discussed' : 'completed';
 
-      // Update task
+      // Sync to Todoist first (if connected and has Todoist ID)
+      if (context.todoistClient && task.todoistTaskId) {
+        try {
+          console.log('[complete_task] Completing in Todoist:', task.todoistTaskId);
+          await completeTodoistTask(context.todoistClient as TodoistClient, task.todoistTaskId);
+          console.log('[complete_task] Completed in Todoist');
+        } catch (todoistError) {
+          console.error('[complete_task] Todoist sync failed:', todoistError);
+          // Continue even if Todoist sync fails
+        }
+      }
+
+      // Update task locally
       const [updated] = await context.db
         .update(tasks)
         .set({
@@ -444,6 +524,7 @@ export const completeTask: Tool = {
         success: true,
         data: {
           taskId: updated!.id,
+          todoistTaskId: task.todoistTaskId,
           title: updated!.title,
           type: updated!.type,
           status: updated!.status,
@@ -511,13 +592,26 @@ export const deleteTask: Tool = {
         todoistTaskId: task.todoistTaskId,
       };
 
-      // Delete task
+      // Delete from Todoist first (if connected and has Todoist ID)
+      if (context.todoistClient && task.todoistTaskId) {
+        try {
+          console.log('[delete_task] Deleting from Todoist:', task.todoistTaskId);
+          await deleteTodoistTask(context.todoistClient as TodoistClient, task.todoistTaskId);
+          console.log('[delete_task] Deleted from Todoist');
+        } catch (todoistError) {
+          console.error('[delete_task] Todoist sync failed:', todoistError);
+          // Continue even if Todoist sync fails
+        }
+      }
+
+      // Delete task locally
       await context.db.delete(tasks).where(eq(tasks.id, taskId));
 
       return {
         success: true,
         data: {
           taskId: task.id,
+          todoistTaskId: task.todoistTaskId,
           title: task.title,
           deleted: true,
         },
