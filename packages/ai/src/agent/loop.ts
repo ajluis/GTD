@@ -360,6 +360,19 @@ function parseResponse(
       // LLM sometimes returns indices or simple values in array format when confused
       // IMPORTANT: This must be handled BEFORE the final JSON safety check
       if (Array.isArray(parsed)) {
+        // Check if it's an array with objects containing text fields (e.g., [{text: "..."}])
+        // Gemini sometimes wraps text responses in this format
+        if (parsed.length > 0 && typeof parsed[0] === 'object' && parsed[0] !== null) {
+          const firstItem = parsed[0] as Record<string, unknown>;
+          const textFields = ['text', 'response', 'message', 'content', 'reply', 'answer'];
+          for (const field of textFields) {
+            if (firstItem[field] && typeof firstItem[field] === 'string') {
+              console.log('[AgentLoop] Extracted text from array object:', (firstItem[field] as string).substring(0, 100));
+              return { type: 'text', content: firstItem[field] as string };
+            }
+          }
+        }
+
         // Check if it's an array of primitives (strings or numbers)
         if (parsed.every(item => typeof item === 'string' || typeof item === 'number')) {
           // If it looks like just indices (all numbers or numeric strings), this is likely an error
