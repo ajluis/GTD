@@ -1,6 +1,5 @@
 import type {
   ClassificationResult,
-  PersonForMatching,
   IntentResult,
   IntentType,
   IntentEntities,
@@ -30,7 +29,7 @@ export class GTDClassifier {
    * Classify an incoming SMS message
    *
    * @param message - Raw SMS message text
-   * @param people - User's configured people for agenda matching
+   * @param _people - Deprecated: People are now extracted from messages directly
    * @param currentTime - Current time for date parsing (optional)
    * @param conversationHistory - Recent conversation messages for context (optional)
    * @param mode - 'classify' (default) or 'extract' (for re-classification after clarification)
@@ -39,13 +38,13 @@ export class GTDClassifier {
    */
   async classify(
     message: string,
-    people: PersonForMatching[] = [],
+    _people: unknown[] = [],
     currentTime: Date = new Date(),
     conversationHistory: ConversationMessage[] = [],
     mode: 'classify' | 'extract' = 'classify',
     timezone: string = 'America/New_York'
   ): Promise<ClassificationResult> {
-    const prompt = buildClassificationPrompt(message, people, currentTime, conversationHistory, mode, timezone);
+    const prompt = buildClassificationPrompt(message, [], currentTime, conversationHistory, mode, timezone);
 
     try {
       const result = await this.gemini.generateJSON<RawClassificationResult>(
@@ -165,17 +164,8 @@ export class GTDClassifier {
     if (rawEntities['taskType'] && isValidTaskType(String(rawEntities['taskType']))) {
       entities.taskType = rawEntities['taskType'] as IntentEntities['taskType'];
     }
-    if (rawEntities['dayOfWeek'] && isValidDayOfWeek(String(rawEntities['dayOfWeek']))) {
-      entities.dayOfWeek = rawEntities['dayOfWeek'] as IntentEntities['dayOfWeek'];
-    }
-    if (rawEntities['frequency'] && isValidFrequency(String(rawEntities['frequency']))) {
-      entities.frequency = rawEntities['frequency'] as IntentEntities['frequency'];
-    }
     if (rawEntities['noteContent']) {
       entities.noteContent = String(rawEntities['noteContent']).trim();
-    }
-    if (Array.isArray(rawEntities['aliases'])) {
-      entities.aliases = (rawEntities['aliases'] as unknown[]).map((a) => String(a).trim());
     }
 
     const intent: IntentResult = {
@@ -312,17 +302,11 @@ const VALID_INTENTS: IntentType[] = [
   'query_waiting',
   'query_someday',
   'query_context',
-  'query_people',
   'query_person_agenda',
   // Completion
   'complete_task',
   'complete_recent',
   'complete_person_agenda',
-  // People management
-  'add_person',
-  'remove_person',
-  'set_alias',
-  'set_schedule',
   // Settings
   'set_digest_time',
   'set_timezone',
@@ -360,8 +344,6 @@ const VALID_INTENTS: IntentType[] = [
 const VALID_CONTEXTS = ['computer', 'phone', 'home', 'outside'] as const;
 const VALID_PRIORITIES = ['today', 'this_week', 'soon'] as const;
 const VALID_TASK_TYPES = ['action', 'project', 'waiting', 'someday', 'agenda'] as const;
-const VALID_DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const;
-const VALID_FREQUENCIES = ['daily', 'weekly', 'biweekly', 'monthly', 'as_needed'] as const;
 
 function isValidContext(context: string): boolean {
   return VALID_CONTEXTS.includes(context as any);
@@ -412,14 +394,6 @@ function isValidPriority(priority: string): boolean {
 
 function isValidTaskType(taskType: string): boolean {
   return VALID_TASK_TYPES.includes(taskType as any);
-}
-
-function isValidDayOfWeek(day: string): boolean {
-  return VALID_DAYS.includes(day.toLowerCase() as any);
-}
-
-function isValidFrequency(frequency: string): boolean {
-  return VALID_FREQUENCIES.includes(frequency as any);
 }
 
 function isValidDate(date: string): boolean {

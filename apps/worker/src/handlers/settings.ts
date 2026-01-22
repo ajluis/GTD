@@ -296,7 +296,7 @@ export async function handleSetReviewDay(
   entities: IntentEntities,
   ctx: HandlerContext
 ): Promise<string> {
-  const dayValue = entities.dayOfWeek ?? entities.newValue?.toLowerCase().trim();
+  const dayValue = entities.newValue?.toLowerCase().trim();
 
   const validDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 

@@ -269,10 +269,6 @@ export class UnifiedAgent {
         id: `recent-${i}`,
         title: t.title,
       })),
-      lastPeople: userContext.entities.people.slice(0, 5).map((p) => ({
-        id: p.id,
-        name: p.name,
-      })),
       undoStack: [],
       updatedAt: new Date(),
       expiresAt: new Date(Date.now() + 60 * 60 * 1000),
@@ -488,7 +484,6 @@ ${memoryLines}
             title: t.title,
             createdAt: new Date(),
           })),
-          people: result.updatedContext.lastPeople,
         },
         timestamp: new Date(),
       });

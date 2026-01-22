@@ -4,7 +4,7 @@
  */
 
 import type { Tool, ToolContext, ToolResult } from '../types.js';
-import { users, tasks, people } from '@gtd/database';
+import { users, tasks } from '@gtd/database';
 import { eq, and, ne, count } from 'drizzle-orm';
 
 export const getUserSettings: Tool = {
@@ -127,13 +127,12 @@ export const getProductivityStats: Tool = {
         (t: TaskType) => t.dueDate && today && t.dueDate < today
       );
 
-      // People count
-      const userPeople = await context.db.query.people.findMany({
-        where: and(
-          eq(people.userId, context.userId),
-          eq(people.active, true)
-        ),
-      });
+      // Count unique people from personName field
+      const uniquePeople = new Set(
+        activeTasks
+          .filter((t: TaskType) => t.personName)
+          .map((t: TaskType) => t.personName)
+      );
 
       return {
         success: true,
@@ -154,10 +153,8 @@ export const getProductivityStats: Tool = {
           byType,
           byContext,
           people: {
-            total: userPeople.length,
-            withPendingAgenda: userPeople.filter((p: typeof userPeople[0]) =>
-              activeTasks.some((t: TaskType) => t.personId === p.id && t.type === 'agenda')
-            ).length,
+            total: uniquePeople.size,
+            withPendingAgenda: activeTasks.filter((t: TaskType) => t.type === 'agenda' && t.personName).length,
           },
         },
       };

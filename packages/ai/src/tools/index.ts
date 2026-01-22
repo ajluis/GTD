@@ -6,7 +6,6 @@
 import type { Tool } from './types.js';
 
 // Lookup tools
-import { lookupPeople } from './lookup/people.js';
 import { lookupTasks, lookupTodayTasks } from './lookup/tasks.js';
 import { lookupMessages } from './lookup/messages.js';
 import { getUserSettings, getProductivityStats } from './lookup/settings.js';
@@ -24,7 +23,6 @@ import {
   batchCompleteTasks,
   batchDeleteTasks,
 } from './actions/batch.js';
-import { createPerson, updatePerson, removePerson } from './actions/people.js';
 import {
   setTimezone,
   setDigestTime,
@@ -42,7 +40,6 @@ export * from './types.js';
  */
 export const allTools: Tool[] = [
   // Lookup tools (read-only, safe)
-  lookupPeople,
   lookupTasks,
   lookupTodayTasks,
   lookupMessages,
@@ -60,11 +57,6 @@ export const allTools: Tool[] = [
   batchCreateTasks,
   batchCompleteTasks,
   batchDeleteTasks,
-
-  // People tools
-  createPerson,
-  updatePerson,
-  removePerson,
 
   // Settings tools
   setTimezone,
@@ -97,7 +89,6 @@ export function getTools(names: string[]): Tool[] {
 export const toolSets = {
   /** Tools for reading data only */
   lookup: [
-    lookupPeople,
     lookupTasks,
     lookupTodayTasks,
     lookupMessages,
@@ -117,20 +108,10 @@ export const toolSets = {
   ],
 
   /** Tools for batch operations */
-  batch: [
-    lookupTasks,
-    lookupPeople,
-    batchCreateTasks,
-    batchCompleteTasks,
-    batchDeleteTasks,
-  ],
-
-  /** Tools for people operations */
-  people: [lookupPeople, createPerson, updatePerson, removePerson],
+  batch: [lookupTasks, batchCreateTasks, batchCompleteTasks, batchDeleteTasks],
 
   /** Tools for query operations */
   query: [
-    lookupPeople,
     lookupTasks,
     lookupTodayTasks,
     lookupMessages,
@@ -179,7 +160,6 @@ ${params || '    (none)'}`;
 
 // Re-export individual tools for direct import
 export {
-  lookupPeople,
   lookupTasks,
   lookupTodayTasks,
   lookupMessages,
@@ -193,9 +173,6 @@ export {
   batchCreateTasks,
   batchCompleteTasks,
   batchDeleteTasks,
-  createPerson,
-  updatePerson,
-  removePerson,
   setTimezone,
   setDigestTime,
   setMeetingReminderHours,

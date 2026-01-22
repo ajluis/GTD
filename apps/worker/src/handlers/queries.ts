@@ -1,5 +1,3 @@
-import { people } from '@gtd/database';
-import { eq } from 'drizzle-orm';
 import {
   createTodoistClient,
   queryDueToday,
@@ -254,31 +252,8 @@ export async function handleQueryContext(
 }
 
 /**
- * Handle query_people intent
- */
-export async function handleQueryPeople(ctx: HandlerContext): Promise<string> {
-  const userPeople = await ctx.db.query.people.findMany({
-    where: eq(people.userId, ctx.user.id),
-  });
-
-  if (userPeople.length === 0) {
-    return "👥 PEOPLE:\nNo people added yet.\n\nAdd someone by texting 'track [name]' or 'add person [name]'.";
-  }
-
-  const lines = userPeople.map((p) => {
-    const schedule = p.frequency && p.dayOfWeek
-      ? ` (${p.frequency} on ${p.dayOfWeek})`
-      : p.frequency
-        ? ` (${p.frequency})`
-        : '';
-    return `• ${p.name}${schedule}`;
-  });
-
-  return `👥 PEOPLE:\n${lines.join('\n')}`;
-}
-
-/**
  * Handle query_person_agenda intent
+ * Simplified: uses personName directly for Todoist label query
  */
 export async function handleQueryPersonAgenda(
   entities: IntentEntities,
@@ -289,43 +264,28 @@ export async function handleQueryPersonAgenda(
     return "Whose agenda? Text a person's name to see their items.";
   }
 
-  // Find person in user's list
-  const userPeople = await ctx.db.query.people.findMany({
-    where: eq(people.userId, ctx.user.id),
-  });
-
-  const person = userPeople.find(
-    (p) =>
-      p.name.toLowerCase() === personName.toLowerCase() ||
-      p.aliases?.some((a) => a.toLowerCase() === personName.toLowerCase())
-  );
-
-  if (!person) {
-    return `I don't have "${personName}" in your people list.\n\nAdd them with 'track ${personName}'`;
-  }
-
   if (!ctx.user.todoistAccessToken) {
-    return `👤 ${person.name}\n\nConnect Todoist first to see agenda items.`;
+    return `👤 ${personName}\n\nConnect Todoist first to see agenda items.`;
   }
 
   try {
     const todoist = createTodoistClient(ctx.user.todoistAccessToken);
     // Query by person's label (lowercase, underscores)
-    const personLabel = person.name.toLowerCase().replace(/\s+/g, '_');
+    const personLabel = personName.toLowerCase().replace(/\s+/g, '_');
     const agendaItems = await queryByLabel(todoist, personLabel);
 
     if (agendaItems.length === 0) {
-      return `👤 ${person.name}\n\nNo pending agenda items.\n\nAdd one by texting '@${person.name.split(' ')[0]} [topic]'`;
+      return `👤 ${personName}\n\nNo pending agenda items.\n\nAdd one by texting '@${personName.split(' ')[0]} [topic]'`;
     }
 
     const formatted = agendaItems.map((t) => ({
       title: extractTaskTitle(t),
     }));
 
-    return formatTaskList(`👤 ${person.name} (${agendaItems.length} pending):`, formatted, true);
+    return formatTaskList(`👤 ${personName} (${agendaItems.length} pending):`, formatted, true);
   } catch (error) {
     console.error('[Query:person_agenda] Error:', error);
-    return `👤 ${person.name}\n\nCouldn't fetch agenda items. Try again later.`;
+    return `👤 ${personName}\n\nCouldn't fetch agenda items. Try again later.`;
   }
 }
 

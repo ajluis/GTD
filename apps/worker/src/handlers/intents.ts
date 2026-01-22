@@ -12,7 +12,6 @@ import {
   handleQueryWaiting,
   handleQuerySomeday,
   handleQueryContext,
-  handleQueryPeople,
   handleQueryPersonAgenda,
   handleShowWeeklyReview,
 } from './queries.js';
@@ -21,12 +20,6 @@ import {
   handleCompleteRecent,
   handleCompletePersonAgenda,
 } from './completion.js';
-import {
-  handleAddPerson,
-  handleRemovePerson,
-  handleSetAlias,
-  handleSetSchedule,
-} from './people.js';
 import {
   handleSetDigestTime,
   handleSetTimezone,
@@ -114,8 +107,6 @@ export async function handleIntent(
         return handleQuerySomeday(ctx);
       case 'query_context':
         return handleQueryContext(intent.entities, ctx);
-      case 'query_people':
-        return handleQueryPeople(ctx);
       case 'query_person_agenda':
         return handleQueryPersonAgenda(intent.entities, ctx);
 
@@ -126,16 +117,6 @@ export async function handleIntent(
         return handleCompleteRecent(ctx);
       case 'complete_person_agenda':
         return handleCompletePersonAgenda(intent.entities, ctx);
-
-      // People management intents
-      case 'add_person':
-        return handleAddPerson(intent.entities, ctx);
-      case 'remove_person':
-        return handleRemovePerson(intent.entities, ctx);
-      case 'set_alias':
-        return handleSetAlias(intent.entities, ctx);
-      case 'set_schedule':
-        return handleSetSchedule(intent.entities, ctx);
 
       // Settings intents
       case 'set_digest_time':

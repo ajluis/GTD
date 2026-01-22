@@ -7,13 +7,20 @@
  * - "Did you mean?" confirmations
  */
 
-import type { PersonForMatching } from '@gtd/shared-types';
+/**
+ * Person entity for fuzzy matching
+ */
+export interface PersonForFuzzyMatch {
+  id: string;
+  name: string;
+  aliases: string[];
+}
 
 /**
  * Result of a fuzzy person match
  */
 export interface FuzzyMatchResult {
-  person: PersonForMatching;
+  person: PersonForFuzzyMatch;
   matchedOn: 'name' | 'alias';
   distance: number;
   confidence: number;
@@ -90,7 +97,7 @@ export function getMaxDistance(length: number): number {
  */
 export function findFuzzyMatches(
   input: string,
-  people: PersonForMatching[],
+  people: PersonForFuzzyMatch[],
   threshold?: number
 ): FuzzyMatchResult[] {
   const inputLower = input.toLowerCase().trim();
@@ -157,7 +164,7 @@ export function findFuzzyMatches(
  */
 export function findBestFuzzyMatch(
   input: string,
-  people: PersonForMatching[],
+  people: PersonForFuzzyMatch[],
   minConfidence = 0.6
 ): FuzzyMatchResult | null {
   const matches = findFuzzyMatches(input, people);

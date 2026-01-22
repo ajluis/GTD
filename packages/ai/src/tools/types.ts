@@ -4,13 +4,7 @@
  */
 
 import type { DbClient } from '@gtd/database';
-import type {
-  TaskType,
-  TaskContext,
-  TaskPriority,
-  DayOfWeek,
-  MeetingFrequency,
-} from '@gtd/shared-types';
+import type { TaskType, TaskContext, TaskPriority } from '@gtd/shared-types';
 
 /**
  * JSON Schema subset for tool parameter definitions
@@ -89,7 +83,6 @@ export interface ToolResult {
   /** Entities to track in conversation context */
   trackEntities?: {
     tasks?: TaskReference[];
-    people?: PersonReference[];
     lastCreatedTaskId?: string;
   };
 }
@@ -104,14 +97,6 @@ export interface TaskReference {
 }
 
 /**
- * Reference to a person for conversation context
- */
-export interface PersonReference {
-  id: string;
-  name: string;
-}
-
-/**
  * Conversation context for multi-turn interactions
  */
 export interface ConversationContext {
@@ -119,9 +104,6 @@ export interface ConversationContext {
 
   /** Last tasks shown/created (for "the first one", "that task") */
   lastTasks: TaskReference[];
-
-  /** Last people referenced (for "their agenda", "them") */
-  lastPeople: PersonReference[];
 
   /** Last created task ID (for immediate edits) */
   lastCreatedTaskId?: string;
@@ -149,8 +131,7 @@ export type UndoAction =
   | { type: 'delete_created_task'; taskId: string; todoistTaskId?: string }
   | { type: 'restore_deleted_task'; taskData: StoredTaskData }
   | { type: 'revert_task_update'; taskId: string; previousData: Partial<StoredTaskData> }
-  | { type: 'uncomplete_task'; taskId: string; todoistTaskId?: string }
-  | { type: 'restore_person'; personData: StoredPersonData };
+  | { type: 'uncomplete_task'; taskId: string; todoistTaskId?: string };
 
 /**
  * Stored task data for undo operations
@@ -163,21 +144,9 @@ export interface StoredTaskData {
   context: TaskContext | null;
   priority: TaskPriority | null;
   dueDate: string | null;
-  personId: string | null;
+  personName: string | null;
   notes: string | null;
   todoistTaskId: string | null;
-}
-
-/**
- * Stored person data for undo operations
- */
-export interface StoredPersonData {
-  id: string;
-  name: string;
-  aliases: string[] | null;
-  frequency: MeetingFrequency | null;
-  dayOfWeek: DayOfWeek | null;
-  todoistLabel: string | null;
 }
 
 /**

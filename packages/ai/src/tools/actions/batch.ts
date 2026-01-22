@@ -4,7 +4,7 @@
  */
 
 import type { Tool, ToolContext, ToolResult } from '../types.js';
-import { tasks, users, people } from '@gtd/database';
+import { tasks, users } from '@gtd/database';
 import { eq, and, inArray } from 'drizzle-orm';
 
 interface BatchTaskInput {
@@ -59,11 +59,6 @@ export const batchCreateTasks: Tool = {
     const { tasks: taskInputs } = params as { tasks: BatchTaskInput[] };
 
     try {
-      // Get all user's people for name resolution
-      const userPeople = await context.db.query.people.findMany({
-        where: eq(people.userId, context.userId),
-      });
-
       const createdTasks: Array<{
         id: string;
         title: string;
@@ -76,42 +71,6 @@ export const batchCreateTasks: Tool = {
       // Process each task
       for (const input of taskInputs) {
         try {
-          // Resolve person
-          let personId: string | null = null;
-          let resolvedPersonName: string | undefined;
-
-          if (input.personName) {
-            const match = userPeople.find(
-              (p: typeof userPeople[0]) =>
-                p.name.toLowerCase() === input.personName!.toLowerCase() ||
-                p.aliases?.some(
-                  (a: string) => a.toLowerCase() === input.personName!.toLowerCase()
-                )
-            );
-
-            if (match) {
-              personId = match.id;
-              resolvedPersonName = match.name;
-            } else if (input.type === 'agenda' || input.type === 'waiting') {
-              // Auto-create person
-              const [newPerson] = await context.db
-                .insert(people)
-                .values({
-                  userId: context.userId,
-                  name: input.personName,
-                  active: true,
-                })
-                .returning();
-
-              if (newPerson) {
-                personId = newPerson.id;
-                resolvedPersonName = newPerson.name;
-                // Add to local cache for subsequent items
-                userPeople.push(newPerson);
-              }
-            }
-          }
-
           // Create task
           const [task] = await context.db
             .insert(tasks)
@@ -124,7 +83,7 @@ export const batchCreateTasks: Tool = {
               context: (input.context as any) || null,
               priority: (input.priority as any) || null,
               dueDate: input.dueDate || null,
-              personId,
+              personName: input.personName || null,
               notes: input.notes || null,
             })
             .returning();
@@ -133,7 +92,7 @@ export const batchCreateTasks: Tool = {
             id: task!.id,
             title: task!.title,
             type: task!.type,
-            personName: resolvedPersonName,
+            personName: input.personName,
           });
         } catch (error) {
           errors.push({

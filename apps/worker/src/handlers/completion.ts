@@ -1,4 +1,4 @@
-import { users, people, tasks } from '@gtd/database';
+import { users, tasks } from '@gtd/database';
 import { eq, desc } from 'drizzle-orm';
 import {
   createTodoistClient,
@@ -145,6 +145,7 @@ export async function handleCompleteRecent(ctx: HandlerContext): Promise<string>
 /**
  * Handle complete_person_agenda intent
  * "done with Sarah", "met with John", "all caught up with David"
+ * Simplified: uses personName directly for Todoist label query
  */
 export async function handleCompletePersonAgenda(
   entities: IntentEntities,
@@ -155,21 +156,6 @@ export async function handleCompletePersonAgenda(
     return "Who did you meet with? Try 'done with [name]'";
   }
 
-  // Find person in user's list
-  const userPeople = await ctx.db.query.people.findMany({
-    where: eq(people.userId, ctx.user.id),
-  });
-
-  const person = userPeople.find(
-    (p) =>
-      p.name.toLowerCase() === personName.toLowerCase() ||
-      p.aliases?.some((a) => a.toLowerCase() === personName.toLowerCase())
-  );
-
-  if (!person) {
-    return `I don't have "${personName}" in your people list.\n\nAdd them with 'track ${personName}'`;
-  }
-
   if (!ctx.user.todoistAccessToken) {
     return "Connect Todoist first to process agenda items.";
   }
@@ -177,11 +163,11 @@ export async function handleCompletePersonAgenda(
   try {
     const todoist = createTodoistClient(ctx.user.todoistAccessToken);
     // Person label is lowercase with underscores
-    const personLabel = person.name.toLowerCase().replace(/\s+/g, '_');
+    const personLabel = personName.toLowerCase().replace(/\s+/g, '_');
     const agendaItems = await queryPersonAgenda(todoist, personLabel);
 
     if (agendaItems.length === 0) {
-      return `✅ No pending agenda items for ${person.name}.\n\nGreat meeting! 🎉`;
+      return `✅ No pending agenda items for ${personName}.\n\nGreat meeting! 🎉`;
     }
 
     // Mark all items as discussed (complete them)
@@ -191,7 +177,7 @@ export async function handleCompletePersonAgenda(
       await completeTask(todoist, item.id);
     }
 
-    return `👥 ${person.name} - ${agendaItems.length} items discussed:\n${itemTitles.join('\n')}\n\n✅ All marked as discussed!`;
+    return `👥 ${personName} - ${agendaItems.length} items discussed:\n${itemTitles.join('\n')}\n\n✅ All marked as discussed!`;
   } catch (error) {
     console.error('[Complete:person_agenda] Error:', error);
     return "Couldn't process agenda items. Try again later.";

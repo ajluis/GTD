@@ -12,7 +12,7 @@ import type { ClassifyJobData, MessageJobData } from '@gtd/queue';
 import { enqueueTodoistSync, enqueueOutboundMessage } from '@gtd/queue';
 import type { Queue } from 'bullmq';
 import type { DbClient } from '@gtd/database';
-import { users, messages, tasks, people } from '@gtd/database';
+import { users, messages, tasks } from '@gtd/database';
 import { eq, desc } from 'drizzle-orm';
 
 // New hybrid architecture imports
@@ -143,6 +143,7 @@ export function createHybridClassifyProcessor(
 
 /**
  * Handle multi-item brain dump
+ * Simplified: stores personName directly instead of resolving to people table
  */
 async function handleMultiItem(
   classification: FastClassifyResult,
@@ -156,50 +157,12 @@ async function handleMultiItem(
     return "I couldn't parse any items from your message. Try listing them with bullet points or line breaks.";
   }
 
-  // Get user's people for name resolution
-  const userPeople = await db.query.people.findMany({
-    where: eq(people.userId, user.id),
-  });
-
   const createdTasks: Array<{ title: string; type: string; personName?: string }> = [];
   const errors: string[] = [];
 
   for (const item of items) {
     try {
-      // Resolve person
-      let personId: string | null = null;
-      let resolvedPersonName: string | undefined;
-
-      if (item.personName) {
-        const match = userPeople.find(
-          (p) =>
-            p.name.toLowerCase() === item.personName!.toLowerCase() ||
-            p.aliases?.some((a) => a.toLowerCase() === item.personName!.toLowerCase())
-        );
-
-        if (match) {
-          personId = match.id;
-          resolvedPersonName = match.name;
-        } else if (item.type === 'agenda' || item.type === 'waiting') {
-          // Auto-create person
-          const [newPerson] = await db
-            .insert(people)
-            .values({
-              userId: user.id,
-              name: item.personName,
-              active: true,
-            })
-            .returning();
-
-          if (newPerson) {
-            personId = newPerson.id;
-            resolvedPersonName = newPerson.name;
-            userPeople.push(newPerson); // Add to local cache
-          }
-        }
-      }
-
-      // Create task
+      // Create task with personName directly
       const [task] = await db
         .insert(tasks)
         .values({
@@ -211,7 +174,7 @@ async function handleMultiItem(
           context: (item.context as any) || null,
           priority: (item.priority as any) || null,
           dueDate: item.dueDate || null,
-          personId,
+          personName: item.personName || null,
         })
         .returning();
 
@@ -233,7 +196,7 @@ async function handleMultiItem(
       createdTasks.push({
         title: task!.title,
         type: task!.type,
-        personName: resolvedPersonName,
+        personName: item.personName,
       });
     } catch (error) {
       console.error('[MultiItem] Error creating task:', error);
@@ -276,6 +239,7 @@ async function handleMultiItem(
 
 /**
  * Handle direct execution (fast path)
+ * Simplified: stores personName directly instead of resolving to people table
  */
 async function handleDirectExecution(
   classification: FastClassifyResult,
@@ -288,43 +252,7 @@ async function handleDirectExecution(
   if (classification.type === 'task' && classification.taskCapture) {
     const task = classification.taskCapture;
 
-    // Resolve person if needed
-    let personId: string | null = null;
-    let resolvedPersonName: string | undefined;
-
-    if (task.personName) {
-      const userPeople = await db.query.people.findMany({
-        where: eq(people.userId, user.id),
-      });
-
-      const match = userPeople.find(
-        (p) =>
-          p.name.toLowerCase() === task.personName!.toLowerCase() ||
-          p.aliases?.some((a) => a.toLowerCase() === task.personName!.toLowerCase())
-      );
-
-      if (match) {
-        personId = match.id;
-        resolvedPersonName = match.name;
-      } else if (task.type === 'agenda' || task.type === 'waiting') {
-        // Auto-create person
-        const [newPerson] = await db
-          .insert(people)
-          .values({
-            userId: user.id,
-            name: task.personName,
-            active: true,
-          })
-          .returning();
-
-        if (newPerson) {
-          personId = newPerson.id;
-          resolvedPersonName = newPerson.name;
-        }
-      }
-    }
-
-    // Create task
+    // Create task with personName directly
     const [created] = await db
       .insert(tasks)
       .values({
@@ -336,7 +264,7 @@ async function handleDirectExecution(
         context: (task.context as any) || null,
         priority: (task.priority as any) || null,
         dueDate: task.dueDate || null,
-        personId,
+        personName: task.personName || null,
       })
       .returning();
 
@@ -370,7 +298,7 @@ async function handleDirectExecution(
       task.context as any,
       task.priority as any,
       task.dueDate,
-      resolvedPersonName
+      task.personName
     );
   }
 
@@ -425,8 +353,6 @@ async function handleWithTools(
 
   if (classification.intent?.type?.startsWith('query_')) {
     tools = toolSets.query;
-  } else if (classification.intent?.type?.includes('person')) {
-    tools = toolSets.people;
   } else if (classification.intent?.type?.includes('batch') || classification.intent?.type?.includes('all')) {
     tools = toolSets.batch;
   }

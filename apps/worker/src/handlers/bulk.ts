@@ -1,5 +1,4 @@
-import { people, conversationStates } from '@gtd/database';
-import { eq } from 'drizzle-orm';
+import { conversationStates } from '@gtd/database';
 import {
   createTodoistClient,
   queryDueToday,
@@ -22,6 +21,7 @@ function extractTaskTitle(task: TodoistTaskResult): string {
 /**
  * Handle clear_person_agenda intent
  * "clear Sarah's agenda", "remove all items for John"
+ * Simplified: uses personName directly for Todoist label query
  */
 export async function handleClearPersonAgenda(
   entities: IntentEntities,
@@ -33,21 +33,6 @@ export async function handleClearPersonAgenda(
     return "Whose agenda? Try 'clear [name]'s agenda'";
   }
 
-  // Find person
-  const userPeople = await ctx.db.query.people.findMany({
-    where: eq(people.userId, ctx.user.id),
-  });
-
-  const person = userPeople.find(
-    (p) =>
-      p.name.toLowerCase() === personName.toLowerCase() ||
-      p.aliases?.some((a) => a.toLowerCase() === personName.toLowerCase())
-  );
-
-  if (!person) {
-    return `I don't have "${personName}" in your people list.`;
-  }
-
   if (!ctx.user.todoistAccessToken) {
     return "Connect Todoist first to manage agenda items.";
   }
@@ -55,17 +40,17 @@ export async function handleClearPersonAgenda(
   try {
     const todoist = createTodoistClient(ctx.user.todoistAccessToken);
     // Person label is lowercase with underscores
-    const personLabel = person.name.toLowerCase().replace(/\s+/g, '_');
+    const personLabel = personName.toLowerCase().replace(/\s+/g, '_');
     const agendaItems = await queryPersonAgenda(todoist, personLabel);
 
     if (agendaItems.length === 0) {
-      return `${person.name} has no pending agenda items.`;
+      return `${personName} has no pending agenda items.`;
     }
 
     // Single item - clear immediately
     if (agendaItems.length === 1) {
       await completeTask(todoist, agendaItems[0]!.id);
-      return `✅ Cleared 1 agenda item for ${person.name}.`;
+      return `✅ Cleared 1 agenda item for ${personName}.`;
     }
 
     // Multiple items - ask for confirmation
@@ -84,7 +69,7 @@ export async function handleClearPersonAgenda(
         operation: 'clear_person_agenda',
         taskIds,
         taskTitles,
-        personName: person.name,
+        personName,
       } satisfies BatchConfirmationData,
       expiresAt,
     });
@@ -92,7 +77,7 @@ export async function handleClearPersonAgenda(
     const taskNames = taskTitles.slice(0, 3).map((t) => `• ${t}`);
     const moreText = agendaItems.length > 3 ? `\n• (+${agendaItems.length - 3} more)` : '';
 
-    return `Clear ${agendaItems.length} agenda items for ${person.name}?\n${taskNames.join('\n')}${moreText}\n\nReply 'yes' to confirm.`;
+    return `Clear ${agendaItems.length} agenda items for ${personName}?\n${taskNames.join('\n')}${moreText}\n\nReply 'yes' to confirm.`;
   } catch (error) {
     console.error('[Bulk:clear_agenda] Error:', error);
     return "Couldn't clear agenda. Try again later.";

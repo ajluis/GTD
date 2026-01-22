@@ -1,6 +1,5 @@
 import { pgTable, uuid, text, timestamp, date, pgEnum, index } from 'drizzle-orm/pg-core';
 import { users } from './users.js';
-import { people } from './people.js';
 
 /**
  * GTD Task type enum
@@ -87,8 +86,8 @@ export const tasks = pgTable(
     priority: taskPriorityEnum('priority'),
 
     // Relationships
-    /** Person associated with agenda/waiting items */
-    personId: uuid('person_id').references(() => people.id, { onDelete: 'set null' }),
+    /** Person name associated with agenda/waiting items (extracted from message) */
+    personName: text('person_name'),
 
     /** Parent project for sub-tasks */
     parentProjectId: uuid('parent_project_id').references((): any => tasks.id, {
@@ -116,7 +115,7 @@ export const tasks = pgTable(
     index('idx_tasks_user_id').on(table.userId),
     index('idx_tasks_user_type_status').on(table.userId, table.type, table.status),
     index('idx_tasks_user_context').on(table.userId, table.context),
-    index('idx_tasks_user_person').on(table.userId, table.personId),
+    index('idx_tasks_user_person').on(table.userId, table.personName),
     index('idx_tasks_user_due').on(table.userId, table.dueDate),
     index('idx_tasks_notion_page').on(table.notionPageId),
     index('idx_tasks_todoist_task').on(table.todoistTaskId),

@@ -11,7 +11,7 @@
  */
 
 import type { DbClient } from '@gtd/database';
-import { userPreferences, userPatterns, todoistEntityCache, people } from '@gtd/database/schema';
+import { userPreferences, userPatterns, todoistEntityCache } from '@gtd/database/schema';
 import { eq } from 'drizzle-orm';
 import type {
   UserContext,
@@ -661,25 +661,11 @@ export class ContextManager {
         where: eq(todoistEntityCache.userId, userId),
       });
 
-      // Load people from database
-      const peopleResult = await this.db.query.people.findMany({
-        where: eq(people.userId, userId),
-      });
-
-      const personEntities: PersonEntity[] = peopleResult.map((p) => ({
-        id: p.id,
-        name: p.name,
-        aliases: p.aliases ?? [],
-        frequency: p.frequency ?? undefined,
-        dayOfWeek: p.dayOfWeek ?? undefined,
-        todoistLabel: p.todoistLabel ?? undefined,
-        active: p.active ?? true,
-      }));
-
       // Return entities
+      // Note: People are now extracted directly from task personName field, not stored separately
       if (cached && cached.expiresAt > new Date()) {
         return {
-          people: personEntities,
+          people: [],
           projects: cached.projects,
           labels: cached.labels,
           recurringPatterns: [],
@@ -690,7 +676,7 @@ export class ContextManager {
       // Cache expired or missing - return with empty projects/labels
       // (will be synced from Todoist)
       return {
-        people: personEntities,
+        people: [],
         projects: [],
         labels: [],
         recurringPatterns: [],

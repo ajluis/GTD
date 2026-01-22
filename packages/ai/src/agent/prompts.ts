@@ -3,7 +3,7 @@
  * Prompts for the tool-enabled agent loop
  */
 
-import type { Tool, ConversationContext, TaskReference, PersonReference } from '../tools/types.js';
+import type { Tool, ConversationContext, TaskReference } from '../tools/types.js';
 import { formatToolsForPrompt } from '../tools/index.js';
 
 /**
@@ -31,7 +31,6 @@ export function buildAgentSystemPrompt(
   });
 
   const lastTasksStr = formatLastTasks(context.lastTasks);
-  const lastPeopleStr = formatLastPeople(context.lastPeople);
   const toolsStr = formatToolsForPrompt(tools);
 
   return `You are a GTD (Getting Things Done) assistant with access to tools.
@@ -47,9 +46,6 @@ Timezone: ${timezone}
 
 Last referenced tasks (for "that", "the first one", etc.):
 ${lastTasksStr}
-
-Last referenced people (for "their agenda", "them"):
-${lastPeopleStr}
 
 ═══════════════════════════════════════════════════════════════
 AVAILABLE TOOLS
@@ -67,7 +63,6 @@ GUIDELINES
 
 2. CONTEXTUAL REFERENCES
    - "that", "it", "the first one" → use lastTasks from context
-   - "them", "their agenda" → use lastPeople from context
    - Index 1 = first item shown to user
 
 3. SMART DEFAULTS
@@ -76,7 +71,7 @@ GUIDELINES
      * @phone: call, text, message, contact, reach out
      * @outside (or @home): buy, pick up, go to, meet, visit, drop off, mail
    - DO NOT add priority unless user says: urgent, ASAP, important, high priority, this week
-   - Auto-create people for agenda/waiting items if not found
+   - Extract person name directly from message for agenda/waiting items
 
 4. SEARCHING FOR TASKS BY PERSON
    - When searching for tasks related to a person, ALWAYS use lookup_tasks with personName
@@ -120,11 +115,25 @@ GUIDELINES
    Never expose technical errors to the user.
 
 10. BRAIN DUMPS
-   When user sends multiple items:
-   - Parse each line/bullet as separate task
-   - Classify type independently (action, waiting, agenda, etc.)
-   - Create all with batch_create_tasks
-   - Summarize what was created
+    When user sends multiple items:
+    - Parse each line/bullet as separate task
+    - Classify type independently (action, waiting, agenda, etc.)
+    - Create all with batch_create_tasks
+    - Summarize what was created
+
+11. DUE DATE PROMPTING
+    For ALL tasks (action, waiting, agenda), if no due date specified:
+    - Ask "When is this due?" before creating
+    - If user says "no date", "someday", "whenever" → route to Someday project
+    - Only skip prompting for type=someday (already going to Someday)
+
+12. QUICK REFERENCES
+    When user sends a random note (not a task):
+    - Software names: "Notion", "Figma"
+    - Addresses: "123 Main Street"
+    - URLs, phone numbers, short phrases
+    Create in References project with no due date, no clarification needed.
+    Response: "📝 Saved to References: [content]"
 
 ═══════════════════════════════════════════════════════════════
 CONTEXT INFERENCE EXAMPLES
@@ -181,20 +190,6 @@ function formatLastTasks(tasks: TaskReference[]): string {
   return tasks
     .slice(0, 5)
     .map((t, i) => `${i + 1}. "${t.title}" (${t.type}, id: ${t.id})`)
-    .join('\n');
-}
-
-/**
- * Format last people for context
- */
-function formatLastPeople(people: PersonReference[]): string {
-  if (!people || people.length === 0) {
-    return '(none)';
-  }
-
-  return people
-    .slice(0, 5)
-    .map((p) => `- ${p.name} (id: ${p.id})`)
     .join('\n');
 }
 

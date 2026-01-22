@@ -3,7 +3,6 @@ import type { ConnectionOptions } from 'bullmq';
 import { createDbClient } from '@gtd/database';
 import { createMessageQueue, createWorkerConnection } from '@gtd/queue';
 import { runDailyDigest } from './jobs/daily-digest.js';
-import { runMeetingReminders } from './jobs/meeting-reminder.js';
 import { runWaitingFollowups } from './jobs/waiting-followup.js';
 import { runWeeklyReview } from './jobs/weekly-review.js';
 
@@ -12,8 +11,8 @@ import { runWeeklyReview } from './jobs/weekly-review.js';
  *
  * Runs scheduled jobs for:
  * - Daily digest messages (morning summary of tasks)
- * - Meeting reminders (X hours before scheduled meeting times)
  * - Waiting task follow-ups (remind about overdue waiting items)
+ * - Weekly review prompts
  *
  * Jobs run on a schedule and check which users are due for notifications
  * based on their timezone and preferences.
@@ -51,16 +50,6 @@ async function main() {
     }
   });
   console.log('[Scheduler] Daily digest job scheduled (checks every minute)');
-
-  // Meeting Reminders - runs every 15 minutes
-  cron.schedule('*/15 * * * *', async () => {
-    try {
-      await runMeetingReminders(db, messageQueue);
-    } catch (error) {
-      console.error('[Scheduler:MeetingReminder] Error:', error);
-    }
-  });
-  console.log('[Scheduler] Meeting reminder job scheduled (every 15 minutes)');
 
   // Waiting Follow-ups - runs daily at 10 AM UTC
   cron.schedule('0 10 * * *', async () => {

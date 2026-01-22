@@ -7,7 +7,7 @@
  */
 
 import type { Tool, ToolContext, ToolResult, StoredTaskData, TodoistClientLike } from '../types.js';
-import { tasks, users, people } from '@gtd/database';
+import { tasks, users } from '@gtd/database';
 import { eq, and, ilike } from 'drizzle-orm';
 import type { TodoistClient } from '@gtd/todoist';
 import { discoverTodoistStructure, type TodoistStructure } from '@gtd/todoist';
@@ -81,13 +81,9 @@ export const createTask: Tool = {
         description: 'Due date in ISO format (YYYY-MM-DD)',
         format: 'date',
       },
-      personId: {
-        type: 'string',
-        description: 'Person ID for agenda/waiting items (from lookup_people)',
-      },
       personName: {
         type: 'string',
-        description: 'Person name if ID not known (will be resolved or created)',
+        description: 'Person name for agenda/waiting items (extracted from message)',
       },
       notes: {
         type: 'string',
@@ -103,7 +99,6 @@ export const createTask: Tool = {
       context: taskContext,
       priority,
       dueDate,
-      personId,
       personName,
       notes,
     } = params as {
@@ -112,49 +107,11 @@ export const createTask: Tool = {
       context?: string;
       priority?: string;
       dueDate?: string;
-      personId?: string;
       personName?: string;
       notes?: string;
     };
 
     try {
-      // Resolve person if name provided but not ID
-      let resolvedPersonId = personId || null;
-      let resolvedPersonName = personName;
-
-      if (!resolvedPersonId && personName) {
-        // Try to find existing person
-        const existingPeople = await context.db.query.people.findMany({
-          where: eq(people.userId, context.userId),
-        });
-
-        const match = existingPeople.find(
-          (p: typeof existingPeople[0]) =>
-            p.name.toLowerCase() === personName.toLowerCase() ||
-            p.aliases?.some((a: string) => a.toLowerCase() === personName.toLowerCase())
-        );
-
-        if (match) {
-          resolvedPersonId = match.id;
-          resolvedPersonName = match.name;
-        } else if (type === 'agenda' || type === 'waiting') {
-          // Auto-create person for agenda/waiting items
-          const [newPerson] = await context.db
-            .insert(people)
-            .values({
-              userId: context.userId,
-              name: personName,
-              active: true,
-            })
-            .returning();
-
-          if (newPerson) {
-            resolvedPersonId = newPerson.id;
-            resolvedPersonName = newPerson.name;
-          }
-        }
-      }
-
       // Sync to Todoist first (if connected)
       let todoistTaskId: string | null = null;
       if (context.todoistClient) {
@@ -170,7 +127,7 @@ export const createTask: Tool = {
               context: taskContext as GTDContext | undefined,
               priority: priority as TaskPriority | undefined,
               dueDate: dueDate || undefined,
-              personName: resolvedPersonName || undefined,
+              personName: personName || undefined,
               notes: notes || undefined,
             }
           );
@@ -193,7 +150,7 @@ export const createTask: Tool = {
           context: taskContext as any || null,
           priority: priority as any || null,
           dueDate: dueDate || null,
-          personId: resolvedPersonId,
+          personName: personName || null,
           notes: notes || null,
           todoistTaskId: todoistTaskId,
         })
@@ -219,8 +176,7 @@ export const createTask: Tool = {
           context: task!.context,
           priority: task!.priority,
           dueDate: task!.dueDate,
-          personId: resolvedPersonId,
-          personName: resolvedPersonName,
+          personName: personName,
         },
         undoAction: {
           type: 'delete_created_task',
@@ -283,9 +239,9 @@ export const updateTask: Tool = {
         description: 'New due date (YYYY-MM-DD)',
         format: 'date',
       },
-      personId: {
+      personName: {
         type: 'string',
-        description: 'New person ID',
+        description: 'New person name',
       },
       notes: {
         type: 'string',
@@ -303,7 +259,7 @@ export const updateTask: Tool = {
       context?: string;
       priority?: string;
       dueDate?: string;
-      personId?: string;
+      personName?: string;
       notes?: string;
     };
 
@@ -377,9 +333,9 @@ export const updateTask: Tool = {
         previousData.dueDate = currentTask.dueDate;
         updateData['dueDate'] = updates['dueDate'];
       }
-      if (updates['personId'] !== undefined) {
-        previousData.personId = currentTask.personId;
-        updateData['personId'] = updates['personId'];
+      if (updates['personName'] !== undefined) {
+        previousData.personName = currentTask.personName;
+        updateData['personName'] = updates['personName'];
       }
       if (updates['notes'] !== undefined) {
         previousData.notes = currentTask.notes;
@@ -587,7 +543,7 @@ export const deleteTask: Tool = {
         context: task.context,
         priority: task.priority,
         dueDate: task.dueDate,
-        personId: task.personId,
+        personName: task.personName,
         notes: task.notes,
         todoistTaskId: task.todoistTaskId,
       };
@@ -678,7 +634,7 @@ export const undoLastAction: Tool = {
               context: action.taskData.context as any,
               priority: action.taskData.priority as any,
               dueDate: action.taskData.dueDate,
-              personId: action.taskData.personId,
+              personName: action.taskData.personName,
               notes: action.taskData.notes,
               todoistTaskId: action.taskData.todoistTaskId,
             })

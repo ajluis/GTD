@@ -4,7 +4,7 @@
  */
 
 import type { Tool, ToolContext, ToolResult } from '../types.js';
-import { tasks, people } from '@gtd/database';
+import { tasks } from '@gtd/database';
 import { eq, and, or, ilike, lte, gte, ne, desc, asc } from 'drizzle-orm';
 
 /**

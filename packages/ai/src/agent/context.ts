@@ -7,7 +7,6 @@ import type { DbClient } from '@gtd/database';
 import type {
   ConversationContext,
   TaskReference,
-  PersonReference,
   UndoAction,
 } from '../tools/types.js';
 
@@ -57,9 +56,6 @@ export class ConversationContextManager {
     if (updates.lastTasks !== undefined) {
       context.lastTasks = updates.lastTasks;
     }
-    if (updates.lastPeople !== undefined) {
-      context.lastPeople = updates.lastPeople;
-    }
     if (updates.lastCreatedTaskId !== undefined) {
       context.lastCreatedTaskId = updates.lastCreatedTaskId;
     }
@@ -88,13 +84,6 @@ export class ConversationContextManager {
    */
   async setLastTasks(userId: string, tasks: TaskReference[]): Promise<void> {
     await this.update(userId, { lastTasks: tasks.slice(0, 10) });
-  }
-
-  /**
-   * Set last referenced people
-   */
-  async setLastPeople(userId: string, people: PersonReference[]): Promise<void> {
-    await this.update(userId, { lastPeople: people.slice(0, 10) });
   }
 
   /**
@@ -159,7 +148,6 @@ export class ConversationContextManager {
     return {
       userId,
       lastTasks: [],
-      lastPeople: [],
       undoStack: [],
       updatedAt: now,
       expiresAt: new Date(now.getTime() + CONTEXT_TTL_MS),

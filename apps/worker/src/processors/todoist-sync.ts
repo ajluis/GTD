@@ -1,7 +1,7 @@
 import type { Job } from 'bullmq';
 import type { TodoistSyncJobData } from '@gtd/queue';
 import type { DbClient } from '@gtd/database';
-import { users, tasks, people } from '@gtd/database';
+import { users, tasks } from '@gtd/database';
 import { eq } from 'drizzle-orm';
 import {
   createTodoistClient,
@@ -52,14 +52,8 @@ export function createTodoistSyncProcessor(db: DbClient) {
       throw new Error(`Task not found: ${taskId}`);
     }
 
-    // 3. Get person details if applicable
-    let personName: string | null = null;
-    if (task.personId) {
-      const person = await db.query.people.findFirst({
-        where: eq(people.id, task.personId),
-      });
-      personName = person?.name ?? null;
-    }
+    // 3. Use personName directly from task (no more people table lookup)
+    const personName = task.personName;
 
     // 4. Create in Todoist with dynamic routing
     try {

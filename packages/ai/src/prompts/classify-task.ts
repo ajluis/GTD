@@ -1,5 +1,3 @@
-import type { PersonForMatching } from '@gtd/shared-types';
-
 /**
  * Conversation message for context
  */
@@ -10,6 +8,15 @@ export interface ConversationMessage {
   content: string;
   /** When the message was sent */
   timestamp: Date;
+}
+
+/**
+ * Person entity for classification (simplified)
+ */
+interface PersonForClassification {
+  id: string;
+  name: string;
+  aliases?: string[];
 }
 
 /**
@@ -24,7 +31,7 @@ export interface ConversationMessage {
  */
 export function buildClassificationPrompt(
   message: string,
-  people: PersonForMatching[],
+  people: PersonForClassification[] = [],
   currentTime: Date,
   conversationHistory: ConversationMessage[] = [],
   mode: 'classify' | 'extract' = 'classify',
@@ -35,10 +42,10 @@ export function buildClassificationPrompt(
       ? people
           .map(
             (p) =>
-              `- ${p.name} (id: ${p.id})${p.aliases.length > 0 ? ` [aliases: ${p.aliases.join(', ')}]` : ''}${p.dayOfWeek ? ` - meets ${p.dayOfWeek}` : ''}`
+              `- ${p.name} (id: ${p.id})${(p.aliases?.length ?? 0) > 0 ? ` [aliases: ${p.aliases!.join(', ')}]` : ''}`
           )
           .join('\n')
-      : '(No people configured yet)';
+      : '(Person names are extracted directly from messages)';
 
   // Format date/time in user's timezone to avoid UTC confusion
   const dayOfWeek = currentTime.toLocaleDateString('en-US', { weekday: 'long', timeZone: timezone });

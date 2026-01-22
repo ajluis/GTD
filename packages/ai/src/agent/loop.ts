@@ -215,10 +215,6 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentResu
             updatedContext.lastTasks = result.trackEntities.tasks;
             context.conversationContext.lastTasks = result.trackEntities.tasks;
           }
-          if (result.trackEntities.people) {
-            updatedContext.lastPeople = result.trackEntities.people;
-            context.conversationContext.lastPeople = result.trackEntities.people;
-          }
           if (result.trackEntities.lastCreatedTaskId) {
             updatedContext.lastCreatedTaskId = result.trackEntities.lastCreatedTaskId;
             context.conversationContext.lastCreatedTaskId = result.trackEntities.lastCreatedTaskId;

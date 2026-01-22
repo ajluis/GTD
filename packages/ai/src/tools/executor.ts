@@ -91,9 +91,6 @@ export async function executeTool(
       if (result.trackEntities.tasks) {
         context.conversationContext.lastTasks = result.trackEntities.tasks;
       }
-      if (result.trackEntities.people) {
-        context.conversationContext.lastPeople = result.trackEntities.people;
-      }
       if (result.trackEntities.lastCreatedTaskId) {
         context.conversationContext.lastCreatedTaskId = result.trackEntities.lastCreatedTaskId;
       }

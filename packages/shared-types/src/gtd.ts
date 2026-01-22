@@ -15,12 +15,6 @@ export type TaskContext = 'computer' | 'phone' | 'home' | 'outside';
 /** Task priority levels */
 export type TaskPriority = 'today' | 'this_week' | 'soon';
 
-/** Meeting frequency for People */
-export type MeetingFrequency = 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'as_needed';
-
-/** Days of the week */
-export type DayOfWeek = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
-
 /** User status during onboarding */
 export type UserStatus = 'onboarding' | 'active' | 'paused';
 
@@ -141,17 +135,6 @@ export type SMSCommand =
   | '@outside';
 
 /**
- * Person data for agenda matching
- */
-export interface PersonForMatching {
-  id: string;
-  name: string;
-  aliases: string[];
-  frequency: MeetingFrequency | null;
-  dayOfWeek: DayOfWeek | null;
-}
-
-/**
  * Intent Types
  * All possible user intents that the LLM can detect
  */
@@ -164,17 +147,11 @@ export type IntentType =
   | 'query_waiting'
   | 'query_someday'
   | 'query_context'
-  | 'query_people'
   | 'query_person_agenda'
   // Task completion - user wants to MARK something done
   | 'complete_task'
   | 'complete_recent'
   | 'complete_person_agenda'
-  // People management - user wants to MANAGE people
-  | 'add_person'
-  | 'remove_person'
-  | 'set_alias'
-  | 'set_schedule'
   // Settings - user wants to CHANGE preferences
   | 'set_digest_time'
   | 'set_timezone'
@@ -212,9 +189,9 @@ export type IntentType =
 export interface IntentEntities {
   /** Task text for searching (e.g., "dentist call") */
   taskText?: string;
-  /** Person name for people operations */
+  /** Person name for agenda/waiting items */
   personName?: string;
-  /** New value for updates (time, timezone, alias, etc.) */
+  /** New value for updates (time, timezone, etc.) */
   newValue?: string;
   /** Context for context operations */
   context?: TaskContext;
@@ -224,14 +201,8 @@ export interface IntentEntities {
   dueDate?: string;
   /** Task type for type changes */
   taskType?: TaskType;
-  /** Day of week for schedule setting */
-  dayOfWeek?: DayOfWeek;
-  /** Meeting frequency for schedule setting */
-  frequency?: MeetingFrequency;
   /** Note content for adding notes */
   noteContent?: string;
-  /** Aliases for alias setting */
-  aliases?: string[];
 }
 
 /**
