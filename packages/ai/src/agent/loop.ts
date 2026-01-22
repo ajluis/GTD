@@ -51,6 +51,13 @@ interface ParsedToolCall {
 export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentResult> {
   const { message, tools, context, maxIterations = 5 } = options;
 
+  console.log('[AgentLoop] ═══════════════════════════════════════════════════════════');
+  console.log('[AgentLoop] 🚀 STARTING AGENT LOOP');
+  console.log('[AgentLoop] User message:', message);
+  console.log('[AgentLoop] Available tools:', tools.map(t => t.name).join(', '));
+  console.log('[AgentLoop] Max iterations:', maxIterations);
+  console.log('[AgentLoop] ═══════════════════════════════════════════════════════════');
+
   const client = createGeminiClient();
   const toolCalls: AgentResult['toolCalls'] = [];
   const updatedContext: Partial<ConversationContext> = {};
@@ -67,8 +74,12 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentResu
   const messages: Message[] = [{ role: 'user', content: message }];
 
   for (let iteration = 0; iteration < maxIterations; iteration++) {
+    console.log(`[AgentLoop] ────────────────────────────────────────────────────`);
+    console.log(`[AgentLoop] 🔄 ITERATION ${iteration + 1}/${maxIterations}`);
+
     // Build full prompt
     const fullPrompt = buildFullPrompt(systemPrompt, messages, tools);
+    console.log(`[AgentLoop] 📤 Sending prompt to LLM...`);
 
     // Get LLM response
     let response: string;
@@ -85,11 +96,23 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentResu
       };
     }
 
+    console.log(`[AgentLoop] 📥 LLM raw response (first 500 chars):`);
+    console.log(response.substring(0, 500));
+    console.log(`[AgentLoop] Response length: ${response.length} chars`);
+
     // Parse response for tool calls
+    console.log(`[AgentLoop] 🔍 Parsing response...`);
     const parsed = parseResponse(response);
 
     if (parsed.type === 'text') {
       // Final response
+      console.log(`[AgentLoop] 💬 FINAL RESPONSE:`);
+      console.log(`[AgentLoop] ${parsed.content}`);
+      console.log('[AgentLoop] ═══════════════════════════════════════════════════════════');
+      console.log('[AgentLoop] ✨ AGENT LOOP COMPLETE');
+      console.log('[AgentLoop] Total tool calls:', toolCalls.length);
+      console.log('[AgentLoop] Success: true');
+      console.log('[AgentLoop] ═══════════════════════════════════════════════════════════');
       return {
         success: true,
         response: parsed.content,
@@ -100,12 +123,18 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentResu
 
     if (parsed.type === 'tool_calls') {
       // Execute tool calls
+      console.log(`[AgentLoop] 🛠️ Tool calls detected: ${parsed.calls.length}`);
+      parsed.calls.forEach((call, i) => {
+        console.log(`[AgentLoop]   ${i + 1}. ${call.name}(${JSON.stringify(call.parameters)})`);
+      });
+
       const results: Array<{ name: string; result: ToolResult }> = [];
 
       for (const call of parsed.calls) {
         const tool = tools.find((t) => t.name === call.name);
 
         if (!tool) {
+          console.log(`[AgentLoop] ❌ Unknown tool: ${call.name}`);
           results.push({
             name: call.name,
             result: { success: false, error: `Unknown tool: ${call.name}` },
@@ -113,7 +142,9 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentResu
           continue;
         }
 
+        console.log(`[AgentLoop] ⚙️ Executing tool: ${call.name}`);
         const result = await executeTool(tool, call.parameters, context);
+        console.log(`[AgentLoop] ✅ Tool result:`, JSON.stringify(result).substring(0, 300));
         results.push({ name: call.name, result });
 
         // Track tool calls
@@ -159,6 +190,11 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentResu
   }
 
   // Max iterations reached
+  console.log('[AgentLoop] ═══════════════════════════════════════════════════════════');
+  console.log('[AgentLoop] ⚠️ MAX ITERATIONS REACHED');
+  console.log('[AgentLoop] Total tool calls:', toolCalls.length);
+  console.log('[AgentLoop] Success: false');
+  console.log('[AgentLoop] ═══════════════════════════════════════════════════════════');
   return {
     success: false,
     response: "I'm having trouble completing your request. Please try rephrasing.",
@@ -192,14 +228,19 @@ STRICT RULES:
 - NEVER wrap your response in quotes or braces
 - NEVER include field names like "response:", "message:", or "text:"
 - NEVER return tool call syntax - tools have already been executed
+- NEVER return array indices like [0] or ["0"] or [1, 2, 3]
 - Just write plain, natural text like a human texting back
 - Keep it under 320 characters
-- Use emojis sparingly: ✅ ⏳ 👤
+- Use emojis sparingly: ✅ ⏳ 👤 📋
 
 ✓ CORRECT: ✅ Added: Buy groceries
-✓ CORRECT: Updated your task - now due today
+✓ CORRECT: Here's your agenda for tomorrow:
+1. Team standup at 9am
+2. Review proposal
 ✗ WRONG: {"response": "Added: Buy groceries"}
 ✗ WRONG: [{"tool": "update_task", ...}]
+✗ WRONG: ["0"]
+✗ WRONG: [0, 1, 2]
 ✗ WRONG: "message": "Done"
 
 Summarize what happened based on the tool results above.
@@ -287,6 +328,29 @@ function parseResponse(
         };
       }
 
+      // Handle arrays of primitives (e.g., ['0'], [0], ['text'])
+      // LLM sometimes returns indices or simple values in array format when confused
+      // IMPORTANT: This must be handled BEFORE the final JSON safety check
+      if (Array.isArray(parsed)) {
+        // Check if it's an array of primitives (strings or numbers)
+        if (parsed.every(item => typeof item === 'string' || typeof item === 'number')) {
+          // If it looks like just indices (all numbers or numeric strings), this is likely an error
+          // Gemini sometimes returns task indices instead of formatting a proper response
+          if (parsed.every(item => typeof item === 'number' || /^\d+$/.test(String(item)))) {
+            console.warn('[AgentLoop] LLM returned array of indices, likely confused:', parsed);
+            // Return a helpful message instead of the fallback error
+            return {
+              type: 'text',
+              content: "I found what you asked for but need to format the response. Let me try again - please repeat your question."
+            };
+          }
+          // If it's an array of text strings, join them as the response
+          const joined = parsed.join(', ');
+          console.log('[AgentLoop] Converted primitive array to text:', joined.substring(0, 100));
+          return { type: 'text', content: joined };
+        }
+      }
+
       // Handle object format: {"tool_calls": [{"name": "...", "parameters": {...}}]}
       if (parsed.tool_calls && Array.isArray(parsed.tool_calls)) {
         return {
@@ -345,7 +409,12 @@ function parseResponse(
         }
 
         // Last resort: don't return raw JSON, ask for clarification
-        console.warn('[AgentLoop] LLM returned unexpected JSON structure:', Object.keys(parsed));
+        console.warn('[AgentLoop] LLM returned unexpected JSON structure:', {
+          keys: Object.keys(parsed),
+          parsedType: typeof parsed,
+          isArray: Array.isArray(parsed),
+          preview: JSON.stringify(parsed).substring(0, 200),
+        });
         return { type: 'text', content: "I processed your request but couldn't format the response. Please try again." };
       }
     }
@@ -360,6 +429,7 @@ function parseResponse(
 
   // Final safety check: never return text that looks like JSON to users
   // This catches any edge cases where JSON slipped through
+  // NOTE: This runs AFTER successful JSON parsing, so it only catches unparseable JSON-like strings
   if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
     console.warn('[AgentLoop] Response looks like JSON but was not parsed, returning fallback');
     return { type: 'text', content: "I processed your request but couldn't format the response. Please try again." };
