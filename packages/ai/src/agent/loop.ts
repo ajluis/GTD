@@ -102,7 +102,8 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentResu
 
     // Parse response for tool calls
     console.log(`[AgentLoop] 🔍 Parsing response...`);
-    const parsed = parseResponse(response);
+    const hasExistingToolResults = messages.some((m) => m.role === 'tool');
+    const parsed = parseResponse(response, hasExistingToolResults, toolCalls);
 
     if (parsed.type === 'text') {
       // Final response
@@ -122,6 +123,28 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentResu
     }
 
     if (parsed.type === 'tool_calls') {
+      // Check if we already have tool results - if so, the LLM should be responding with text, not more tool calls
+      const hasToolResults = messages.some((m) => m.role === 'tool');
+      if (hasToolResults) {
+        console.warn('[AgentLoop] ⚠️ LLM returned tool calls after having tool results - forcing text response');
+        // Synthesize a response from existing tool results
+        const lastCall = toolCalls.length > 0 ? toolCalls[toolCalls.length - 1] : undefined;
+        if (lastCall && lastCall.result.success && lastCall.result.data) {
+          const data = lastCall.result.data as any;
+          if (data.tasks && Array.isArray(data.tasks)) {
+            if (data.tasks.length === 0) {
+              return { success: true, response: "📋 No tasks found for tomorrow.", toolCalls, updatedContext };
+            }
+            const taskList = data.tasks.slice(0, 5).map((t: any, i: number) =>
+              `${i + 1}. ${t.title}${t.dueString ? ` (${t.dueString})` : ''}`
+            ).join('\n');
+            return { success: true, response: `📋 Tomorrow's agenda:\n${taskList}`, toolCalls, updatedContext };
+          }
+        }
+        // Fallback if we can't synthesize
+        return { success: true, response: "I found what you asked for. Please try asking again for details.", toolCalls, updatedContext };
+      }
+
       // Execute tool calls
       console.log(`[AgentLoop] 🛠️ Tool calls detected: ${parsed.calls.length}`);
       parsed.calls.forEach((call, i) => {
@@ -291,9 +314,14 @@ ASSISTANT:`;
 
 /**
  * Parse LLM response for tool calls or final text
+ * @param response - Raw LLM response
+ * @param hasToolResults - Whether we already have tool results in the conversation
+ * @param existingToolCalls - Previous tool calls and their results (for synthesizing responses)
  */
 function parseResponse(
-  response: string
+  response: string,
+  hasToolResults: boolean = false,
+  existingToolCalls: AgentResult['toolCalls'] = []
 ): { type: 'text'; content: string } | { type: 'tool_calls'; calls: ParsedToolCall[] } {
   const trimmed = response.trim();
 
@@ -423,6 +451,32 @@ function parseResponse(
     // This catches cases where Gemini returns truncated or malformed JSON
     if (trimmed.includes('"tool"') || trimmed.includes('"tool_calls"') || trimmed.includes('"parameters"')) {
       console.warn('[AgentLoop] LLM returned malformed JSON that looks like tool calls');
+
+      // If we already have tool results, synthesize a response from them instead of failing
+      if (hasToolResults && existingToolCalls.length > 0) {
+        console.log('[AgentLoop] Synthesizing response from existing tool results');
+        const lastCall = existingToolCalls[existingToolCalls.length - 1]!;
+        if (lastCall.result.success && lastCall.result.data) {
+          const data = lastCall.result.data as any;
+          if (data.tasks && Array.isArray(data.tasks)) {
+            if (data.tasks.length === 0) {
+              return { type: 'text', content: "📋 No tasks found for tomorrow." };
+            }
+            const taskList = data.tasks.slice(0, 5).map((t: any, i: number) =>
+              `${i + 1}. ${t.title}${t.dueString ? ` (${t.dueString})` : ''}`
+            ).join('\n');
+            return { type: 'text', content: `📋 Tomorrow's agenda:\n${taskList}` };
+          }
+          if (data.people && Array.isArray(data.people)) {
+            if (data.people.length === 0) {
+              return { type: 'text', content: "👤 No people found." };
+            }
+            return { type: 'text', content: `Found ${data.people.length} person(s).` };
+          }
+        }
+        return { type: 'text', content: "✅ Found what you asked for. Please try asking again for details." };
+      }
+
       return { type: 'text', content: "I processed your request but couldn't format the response. Please try again." };
     }
   }
