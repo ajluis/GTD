@@ -344,16 +344,16 @@ FOR TASK CAPTURE (complete info):
   "reasoning": "brief explanation"
 }
 
-REQUIRED - Always set context and priority:
+REQUIRED - Context is always inferred, priority only when explicit:
 - context: ALWAYS infer from task action:
   * call/text/email/slack/message → "phone"
   * write/code/research/spreadsheet/design → "computer"
   * buy/shop/pickup/dropoff/appointment/errand → "outside"
   * chore/clean/fix/laundry/cook → "home"
-- priority: ALWAYS set based on timeline:
-  * "today", "asap", "urgent", "now" → "today"
+- priority: ONLY set if user mentions urgency:
+  * "today", "asap", "urgent", "now", "immediately" → "today"
   * "this week", "Tuesday", specific day → "this_week"
-  * no urgency mentioned → "soon"
+  * NO urgency mentioned → DO NOT set priority (omit field)
 
 FOR TASKS THAT NEED MORE CONTEXT (be proactive!):
 Ask follow-up questions to make tasks more actionable. Even if a task COULD be saved,

@@ -1,7 +1,7 @@
 import type { TodoistClient } from '../client.js';
 import type { CreateTaskData, TodoistTask, TodoistProject, TodoistLabel } from '../types.js';
 import type { TaskType, TaskContext, TaskPriority } from '@gtd/shared-types';
-import { buildTaskLabels, getPersonLabel } from './labels.js';
+import { buildTaskLabels } from './labels.js';
 import type { TodoistStructure } from './discovery.js';
 import { findProjectIdByName } from './discovery.js';
 
@@ -89,11 +89,6 @@ export async function createTaskWithRouting(
 
   // 2. Build labels array using the labels service
   const labels = buildTaskLabels(data.type, data.context);
-
-  // Add person label for agenda items
-  if (data.personName && (data.type === 'agenda' || data.type === 'waiting')) {
-    labels.push(getPersonLabel(data.personName));
-  }
 
   // Add context label if not already added by buildTaskLabels
   if (data.context) {
