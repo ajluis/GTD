@@ -3,6 +3,7 @@ export {
   SendblueError,
   createSendblueClient,
   fireTypingIndicator,
+  fireAckMessage,
   type SendblueClientConfig,
 } from './client.js';
 

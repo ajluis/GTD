@@ -7,6 +7,7 @@ import {
   WebhookValidationError,
   createSendblueClient,
   fireTypingIndicator,
+  fireAckMessage,
 } from '@gtd/sendblue';
 import { enqueueInboundMessage } from '@gtd/queue';
 import type { Queue } from 'bullmq';
@@ -161,12 +162,13 @@ export function createSendblueWebhook(config: SendblueWebhookConfig): FastifyPlu
           return reply.status(200).send({ received: true, skipped: true });
         }
 
-        // 4. Send typing indicator (fire-and-forget)
+        // 4. Send acknowledgment and typing indicator (fire-and-forget)
         if (sendblueClient) {
+          fireAckMessage(sendblueClient, normalizedPhone);
           fireTypingIndicator(sendblueClient, normalizedPhone);
           fastify.log.debug(
             { toNumber: normalizedPhone },
-            'Typing indicator sent'
+            'Ack and typing indicator sent'
           );
         }
 

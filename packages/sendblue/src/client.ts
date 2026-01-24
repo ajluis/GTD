@@ -186,3 +186,30 @@ export function fireTypingIndicator(client: SendblueClient, toNumber: string): v
     console.warn(`[Sendblue] Failed to send typing indicator to ${toNumber}:`, error.message);
   });
 }
+
+/**
+ * Acknowledgment phrases for immediate response
+ */
+const ACK_PHRASES = [
+  'On it',
+  'Will do',
+  'Working on this...',
+  'Got it',
+  'One sec...',
+];
+
+/**
+ * Fire-and-forget acknowledgment message
+ *
+ * Sends a random acknowledgment phrase without awaiting or throwing errors.
+ * Failures are logged but never propagate to the caller.
+ *
+ * @param client - SendblueClient instance
+ * @param toNumber - Recipient phone number (E.164 format)
+ */
+export function fireAckMessage(client: SendblueClient, toNumber: string): void {
+  const phrase = ACK_PHRASES[Math.floor(Math.random() * ACK_PHRASES.length)] ?? 'On it';
+  client.sendMessage(toNumber, phrase).catch((error) => {
+    console.warn(`[Sendblue] Failed to send ack to ${toNumber}:`, error.message);
+  });
+}
