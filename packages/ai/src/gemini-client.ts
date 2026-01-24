@@ -6,7 +6,7 @@ import { GoogleGenerativeAI, type GenerativeModel } from '@google/generative-ai'
 export interface GeminiClientConfig {
   /** Google AI API key */
   apiKey: string;
-  /** Model to use (default: gemini-3-flash-preview) */
+  /** Model to use (default: gemini-3-pro-preview) */
   model?: string;
 }
 
@@ -23,7 +23,7 @@ export class GeminiClient {
 
   constructor(config: GeminiClientConfig) {
     this.client = new GoogleGenerativeAI(config.apiKey);
-    this.modelName = config.model ?? 'gemini-3-flash-preview';
+    this.modelName = config.model ?? 'gemini-3-pro-preview';
 
     this.model = this.client.getGenerativeModel({
       model: this.modelName,
