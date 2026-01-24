@@ -216,32 +216,34 @@ function buildFullPrompt(
   const toolInstructions = hasToolResults
     ? `
 ═══════════════════════════════════════════════════════════════
-⚠️ CRITICAL: RESPOND WITH PLAIN TEXT ONLY - ABSOLUTELY NO JSON ⚠️
+TOOL RESULTS RECEIVED - DECIDE NEXT ACTION
 ═══════════════════════════════════════════════════════════════
 
-Tool execution is COMPLETE. Now provide your FINAL response as plain text.
+You have tool results above. Now decide:
 
-STRICT RULES:
-- NEVER output JSON, arrays like [...], or objects like {...}
-- NEVER wrap your response in quotes or braces
-- NEVER include field names like "response:", "message:", or "text:"
-- NEVER return tool call syntax - tools have already been executed
-- NEVER return array indices like [0] or ["0"] or [1, 2, 3]
-- Just write plain, natural text like a human texting back
-- Keep it under 320 characters
-- Use emojis sparingly: ✅ ⏳ 👤 📋
+1. IF YOU NEED TO TAKE ANOTHER ACTION (e.g., complete/update/delete a task you just looked up):
+   → Call another tool using JSON format:
+   {"tool_calls": [{"name": "tool_name", "parameters": {...}}]}
 
-✓ CORRECT: ✅ Added: Buy groceries
-✓ CORRECT: Here's your agenda for tomorrow:
-1. Team standup at 9am
-2. Review proposal
-✗ WRONG: {"response": "Added: Buy groceries"}
-✗ WRONG: [{"tool": "update_task", ...}]
-✗ WRONG: ["0"]
+   COMMON MULTI-STEP PATTERNS:
+   - User says "complete X" or "mark X done" → lookup_tasks found it → NOW call complete_task with the taskId
+   - User says "delete X" → lookup_tasks found it → NOW call delete_task with the taskId
+   - User says "update X" → lookup_tasks found it → NOW call update_task with the taskId
+
+2. IF THE TASK IS DONE (results are the final answer):
+   → Respond with plain text only (NO JSON)
+   → Keep it under 320 characters
+   → Use emojis sparingly: ✅ ⏳ 👤 📋
+
+   PLAIN TEXT RULES:
+   - NO JSON, arrays [...], or objects {...}
+   - NO field names like "response:" or "message:"
+   - Just natural text like a human texting back
+
+✓ CORRECT: ✅ Marked complete: Check ski clothes
+✓ CORRECT: 📋 Tasks:\n1. Buy groceries
+✗ WRONG: {"response": "Done"}
 ✗ WRONG: [0, 1, 2]
-✗ WRONG: "message": "Done"
-
-Summarize what happened based on the tool results above.
 `
     : `
 ═══════════════════════════════════════════════════════════════
@@ -256,7 +258,7 @@ To use a tool, respond with JSON in this exact format:
 }
 
 You can call multiple tools in one response.
-After tool results, provide a final text response to the user.
+After tool results, you may call more tools if needed, or provide a final text response.
 
 If you have all the information needed, respond with plain text (no JSON).
 `;
