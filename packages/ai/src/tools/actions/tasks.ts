@@ -451,7 +451,11 @@ export const completeTask: Tool = {
           console.log('[complete_task] Completed in Todoist');
         } catch (todoistError) {
           console.error('[complete_task] Todoist sync failed:', todoistError);
-          // Continue even if Todoist sync fails
+          // Return failure so user knows the task wasn't completed in Todoist
+          return {
+            success: false,
+            error: `Failed to complete in Todoist: ${todoistError instanceof Error ? todoistError.message : 'Unknown error'}`,
+          };
         }
       }
 
