@@ -428,12 +428,37 @@ export const completeTask: Tool = {
     const { taskId } = params as { taskId: string };
 
     try {
-      // Get task
+      // Detect if this is a Todoist ID (numeric) or local UUID (has dashes)
+      const isTodoistId = /^\d+$/.test(taskId);
+
+      // Get task - query by todoistTaskId if numeric, by id if UUID
       const task = await context.db.query.tasks.findFirst({
-        where: and(eq(tasks.id, taskId), eq(tasks.userId, context.userId)),
+        where: isTodoistId
+          ? and(eq(tasks.todoistTaskId, taskId), eq(tasks.userId, context.userId))
+          : and(eq(tasks.id, taskId), eq(tasks.userId, context.userId)),
       });
 
       if (!task) {
+        // If Todoist ID not found in local DB, complete directly in Todoist
+        if (isTodoistId && context.todoistClient) {
+          try {
+            console.log('[complete_task] Task not in local DB, completing directly in Todoist:', taskId);
+            await completeTodoistTask(context.todoistClient as TodoistClient, taskId);
+            return {
+              success: true,
+              data: {
+                todoistTaskId: taskId,
+                completedDirectly: true,
+                message: 'Task completed in Todoist (not tracked locally)',
+              },
+            };
+          } catch (todoistError) {
+            return {
+              success: false,
+              error: `Task not found locally and Todoist completion failed: ${todoistError instanceof Error ? todoistError.message : 'Unknown error'}`,
+            };
+          }
+        }
         return {
           success: false,
           error: 'Task not found',
