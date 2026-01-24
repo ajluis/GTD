@@ -507,6 +507,18 @@ function tryRepairToolCallJson(json: string): ParsedToolCall | null {
     const parameters: Record<string, unknown> = {};
 
     // Extract common parameters using regex
+    // TaskId (for complete_task, update_task, delete_task)
+    const taskIdMatch = json.match(/"taskId"\s*:\s*"([^"]+)"/);
+    if (taskIdMatch) {
+      parameters['taskId'] = taskIdMatch[1];
+    }
+
+    // SearchText (for lookup_tasks)
+    const searchTextMatch = json.match(/"searchText"\s*:\s*"([^"]+)"/);
+    if (searchTextMatch) {
+      parameters['searchText'] = searchTextMatch[1];
+    }
+
     // Title (for task creation) - handle truncated strings
     const titleMatch = json.match(/"title"\s*:\s*"([^"]*)/);
     if (titleMatch) {
