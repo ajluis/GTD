@@ -7,6 +7,13 @@ settings:
 importers:
 
   .:
+    dependencies:
+      libphonenumber-js:
+        specifier: ^1.11.18
+        version: 1.12.35
+      postgres:
+        specifier: ^3.4.5
+        version: 3.4.8
     devDependencies:
       '@notionhq/client':
         specifier: ^2.2.15
@@ -14,12 +21,6 @@ importers:
       '@types/node':
         specifier: ^20.11.0
         version: 20.19.30
-      libphonenumber-js:
-        specifier: ^1.11.18
-        version: 1.12.35
-      postgres:
-        specifier: ^3.4.5
-        version: 3.4.8
       turbo:
         specifier: ^2.3.0
         version: 2.7.4
