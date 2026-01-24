@@ -164,6 +164,14 @@ export const batchCompleteTasks: Tool = {
   execute: async (params: unknown, context: ToolContext): Promise<ToolResult> => {
     const { taskIds } = params as { taskIds: string[] };
 
+    // Guard against empty array (prevents inArray([]) SQL issues)
+    if (!taskIds || taskIds.length === 0) {
+      return {
+        success: false,
+        error: 'which tasks?',
+      };
+    }
+
     try {
       // Verify all tasks belong to user
       const userTasks = await context.db.query.tasks.findMany({
