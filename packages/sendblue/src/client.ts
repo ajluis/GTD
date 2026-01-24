@@ -196,6 +196,11 @@ const ACK_PHRASES = [
   'Working on this...',
   'Got it',
   'One sec...',
+  'Let me check...',
+  'Hmm, let me think...',
+  'Coming right up',
+  'Allow me a moment...',
+  'Crunching the numbers...',
 ];
 
 /**
