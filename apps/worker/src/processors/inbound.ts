@@ -6,6 +6,7 @@ import type { DbClient } from '@gtd/database';
 import { users, messages } from '@gtd/database';
 import { eq } from 'drizzle-orm';
 import { formatWelcome } from '@gtd/gtd';
+import { normalizePhoneNumberOrThrow } from '@gtd/shared-types';
 
 /**
  * Inbound Message Processor
@@ -22,7 +23,11 @@ export function createInboundProcessor(
   appUrl: string
 ) {
   return async (job: Job<InboundMessageJobData>) => {
-    const { fromNumber, content, messageHandle, receivedAt } = job.data;
+    const { fromNumber: rawFromNumber, content, messageHandle, receivedAt } = job.data;
+
+    // Defense-in-depth: normalize phone number even though webhook should have done it
+    // This ensures data consistency if a message comes through a different path
+    const fromNumber = normalizePhoneNumberOrThrow(rawFromNumber);
 
     console.log('═'.repeat(60));
     console.log(`📨 INBOUND MESSAGE RECEIVED`);

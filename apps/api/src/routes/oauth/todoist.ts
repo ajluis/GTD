@@ -9,6 +9,7 @@ import {
 import { users } from '@gtd/database';
 import { eq } from 'drizzle-orm';
 import type { DbClient } from '@gtd/database';
+import { normalizePhoneNumber } from '@gtd/shared-types';
 
 /**
  * Todoist OAuth configuration
@@ -86,7 +87,19 @@ export function createTodoistOAuthRoutes(config: TodoistOAuthRoutesConfig): Fast
       // Decode phone number from state
       let phoneNumber: string;
       try {
-        phoneNumber = Buffer.from(state, 'base64url').toString('utf-8');
+        const decodedPhone = Buffer.from(state, 'base64url').toString('utf-8');
+        const normalized = normalizePhoneNumber(decodedPhone);
+        if (!normalized) {
+          fastify.log.warn(
+            { decodedPhone },
+            'Invalid phone number in OAuth state'
+          );
+          return reply.status(400).send({
+            error: 'Bad Request',
+            message: 'Invalid phone number in state parameter',
+          });
+        }
+        phoneNumber = normalized;
       } catch {
         return reply.status(400).send({
           error: 'Bad Request',

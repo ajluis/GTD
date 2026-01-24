@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify';
 import type { SendblueWebhookPayload } from '@gtd/shared-types';
+import { normalizePhoneNumber } from '@gtd/shared-types';
 import {
   validateWebhookSignature,
   extractValidationHeaders,
@@ -88,10 +89,24 @@ export function createSendblueWebhook(config: SendblueWebhookConfig): FastifyPlu
         const payload = request.body;
         const rawBody = (request as any).rawBody as string;
 
+        // Normalize phone number to E.164 format for consistent storage/lookup
+        const normalizedPhone = normalizePhoneNumber(payload.from_number);
+        if (!normalizedPhone) {
+          fastify.log.warn(
+            { fromNumber: payload.from_number },
+            'Invalid phone number format received'
+          );
+          return reply.status(400).send({
+            error: 'Bad Request',
+            message: 'Invalid phone number format',
+          });
+        }
+
         // Log incoming message
         fastify.log.info(
           {
-            from: payload.from_number,
+            from: normalizedPhone,
+            rawFrom: payload.from_number !== normalizedPhone ? payload.from_number : undefined,
             content: payload.content?.slice(0, 100),
             isOutbound: payload.is_outbound,
             messageHandle: payload.message_handle,
@@ -140,7 +155,7 @@ export function createSendblueWebhook(config: SendblueWebhookConfig): FastifyPlu
         // 3. Skip if user has opted out
         if (payload.opted_out) {
           fastify.log.info(
-            { fromNumber: payload.from_number },
+            { fromNumber: normalizedPhone },
             'User has opted out'
           );
           return reply.status(200).send({ received: true, skipped: true });
@@ -148,9 +163,9 @@ export function createSendblueWebhook(config: SendblueWebhookConfig): FastifyPlu
 
         // 4. Send typing indicator (fire-and-forget)
         if (sendblueClient) {
-          fireTypingIndicator(sendblueClient, payload.from_number);
+          fireTypingIndicator(sendblueClient, normalizedPhone);
           fastify.log.debug(
-            { toNumber: payload.from_number },
+            { toNumber: normalizedPhone },
             'Typing indicator sent'
           );
         }
@@ -159,7 +174,7 @@ export function createSendblueWebhook(config: SendblueWebhookConfig): FastifyPlu
         try {
           const jobId = await enqueueInboundMessage(config.messageQueue, {
             messageHandle: payload.message_handle,
-            fromNumber: payload.from_number,
+            fromNumber: normalizedPhone,
             content: payload.content,
             receivedAt: payload.date_sent || new Date().toISOString(),
           });
@@ -168,7 +183,7 @@ export function createSendblueWebhook(config: SendblueWebhookConfig): FastifyPlu
             {
               messageHandle: payload.message_handle,
               jobId,
-              fromNumber: payload.from_number,
+              fromNumber: normalizedPhone,
             },
             'Message enqueued for processing'
           );
