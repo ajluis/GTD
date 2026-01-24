@@ -40,6 +40,9 @@ export class GeminiClient {
   /**
    * Generate content with the configured model
    *
+   * Includes automatic retry with exponential backoff for transient errors
+   * (503 Service Unavailable, 429 Rate Limited).
+   *
    * @param prompt - The prompt to send to Gemini
    * @param systemInstruction - Optional system instruction (prepended to prompt)
    * @returns Generated text response
@@ -50,12 +53,51 @@ export class GeminiClient {
       ? `${systemInstruction}\n\n${prompt}`
       : prompt;
 
-    const result = await this.model.generateContent(fullPrompt);
+    const maxRetries = 3;
+    let lastError: Error | undefined;
 
-    const response = result.response;
-    const text = response.text();
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const result = await this.model.generateContent(fullPrompt);
+        return result.response.text();
+      } catch (error) {
+        lastError = error as Error;
 
-    return text;
+        // Check if error is retryable (503 or 429)
+        const isRetryable = this.isRetryableError(error);
+
+        if (!isRetryable || attempt === maxRetries) {
+          throw error;
+        }
+
+        // Exponential backoff: 1s, 2s, 4s
+        const delay = Math.pow(2, attempt - 1) * 1000;
+        console.log(
+          `[GeminiClient] Retrying after ${delay}ms (attempt ${attempt}/${maxRetries})`
+        );
+        await this.sleep(delay);
+      }
+    }
+
+    throw lastError;
+  }
+
+  /**
+   * Check if an error is retryable (transient server error)
+   */
+  private isRetryableError(error: unknown): boolean {
+    if (error && typeof error === 'object' && 'status' in error) {
+      const status = (error as { status: number }).status;
+      return status === 503 || status === 429;
+    }
+    return false;
+  }
+
+  /**
+   * Sleep for specified milliseconds
+   */
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   /**
